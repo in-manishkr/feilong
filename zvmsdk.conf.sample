@@ -1,0 +1,35 @@
+# Sample zvmsdk configuration file for testing
+# Copy this to /etc/zvmsdk/zvmsdk.conf or set ZVMSDK_CONFIG_FILE environment variable
+
+[zvm]
+# z/VM configuration
+user_profile = OSDFLT
+disk_pool = ECKD:diskpool1
+
+[network]
+# Network configuration
+my_ip = 127.0.0.1
+
+[database]
+# Database configuration
+# Backend: sqlite (default), mysql, mariadb, postgresql
+backend = sqlite
+
+# SQLite configuration (default)
+dir = /var/lib/zvmsdk/databases/
+
+# MySQL/MariaDB configuration (uncomment to use)
+# backend = mysql
+# host = localhost
+# port = 3306
+# name = zvmsdk
+# user = zvmsdk
+# password = your_password
+# pool_size = 10
+# pool_recycle = 3600
+# max_overflow = 20
+
+[logging]
+# Logging configuration
+log_dir = /var/log/zvmsdk/
+log_level = logging.INFO

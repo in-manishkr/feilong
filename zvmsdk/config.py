@@ -521,6 +521,170 @@ tell SDK where to store the database files, make sure the process
 running SDK is able to read write and execute the directory.
 '''
         ),
+    Opt('backend',
+        section='database',
+        default='sqlite',
+        opt_type='str',
+        help='''
+Database backend type.
+
+Specifies which database backend to use for storing SDK data.
+
+Possible values:
+    'sqlite': Use SQLite database (default, backward compatible)
+    'mysql': Use MySQL database
+    'mariadb': Use MariaDB database
+    'postgresql': Use PostgreSQL database (future support)
+
+Note: When using 'sqlite', the 'dir' option specifies where database
+files are stored. For other backends, use connection parameters below.
+        '''
+        ),
+    Opt('connection_string',
+        section='database',
+        default=None,
+        opt_type='str',
+        help='''
+Database connection string (optional).
+
+If provided, this connection string will be used directly and will
+override all other database connection parameters (host, port, name,
+user, password). This is useful for advanced configurations.
+
+Format examples:
+    SQLite: sqlite:////var/lib/zvmsdk/databases/zvmsdk.db
+    MySQL: mysql+pymysql://user:password@localhost:3306/zvmsdk
+    MariaDB: mysql+pymysql://user:password@localhost:3306/zvmsdk
+    PostgreSQL: postgresql://user:password@localhost:5432/zvmsdk
+
+Note: For MySQL/MariaDB, the pymysql driver is used.
+        '''
+        ),
+    Opt('host',
+        section='database',
+        default='localhost',
+        opt_type='str',
+        help='''
+Database host address.
+
+The hostname or IP address of the database server. This is used for
+remote database connections (MySQL, MariaDB, PostgreSQL).
+
+Default: localhost
+        '''
+        ),
+    Opt('port',
+        section='database',
+        default=None,
+        opt_type='int',
+        help='''
+Database port number.
+
+The port number on which the database server is listening.
+If not specified, the default port for the selected backend will be used:
+    - MySQL/MariaDB: 3306
+    - PostgreSQL: 5432
+
+This option is ignored for SQLite.
+        '''
+        ),
+    Opt('name',
+        section='database',
+        default='zvmsdk',
+        opt_type='str',
+        help='''
+Database name.
+
+The name of the database to use for storing SDK data.
+For SQLite, this is ignored (database files are named automatically).
+For MySQL/MariaDB/PostgreSQL, this database must exist before starting SDK.
+
+Default: zvmsdk
+        '''
+        ),
+    Opt('user',
+        section='database',
+        default='zvmsdk',
+        opt_type='str',
+        help='''
+Database user name.
+
+The username for authenticating to the database server.
+This option is ignored for SQLite.
+
+Default: zvmsdk
+        '''
+        ),
+    Opt('password',
+        section='database',
+        default=None,
+        opt_type='str',
+        help='''
+Database password.
+
+The password for authenticating to the database server.
+This option is ignored for SQLite.
+
+Security note: Ensure this configuration file has appropriate
+permissions (e.g., 0600) to protect the password.
+        '''
+        ),
+    Opt('pool_size',
+        section='database',
+        default=10,
+        opt_type='int',
+        help='''
+Database connection pool size.
+
+The number of connections to keep open in the connection pool.
+This improves performance by reusing connections instead of
+creating new ones for each operation.
+
+Default: 10
+Recommended range: 5-20 depending on workload
+        '''
+        ),
+    Opt('pool_recycle',
+        section='database',
+        default=3600,
+        opt_type='int',
+        help='''
+Connection pool recycle time in seconds.
+
+Connections older than this value will be recycled (closed and reopened).
+This prevents issues with stale connections and database server timeouts.
+
+Default: 3600 (1 hour)
+        '''
+        ),
+    Opt('max_overflow',
+        section='database',
+        default=20,
+        opt_type='int',
+        help='''
+Maximum overflow connections.
+
+The maximum number of connections that can be created beyond pool_size
+when all pooled connections are in use. These overflow connections
+are closed when returned to the pool.
+
+Default: 20
+Total max connections = pool_size + max_overflow
+        '''
+        ),
+    Opt('echo',
+        section='database',
+        default=False,
+        opt_type='bool',
+        help='''
+Enable SQL query logging.
+
+When set to True, all SQL queries will be logged. This is useful
+for debugging but should be disabled in production for performance.
+
+Default: False
+        '''
+        ),
     Opt('refresh_bootmap_timeout',
         section='volume',
         default=1200,
@@ -751,7 +915,7 @@ class ConfigOpts(object):
                 if v2['required'] and (v2['default'] is None):
                     raise RequiredOptMissingError(k1, k2)
                 # Convert type
-                if v2['type'] == 'int':
+                if v2['type'] == 'int' and v2['default'] is not None:
                     v2['default'] = int(v2['default'])
                 if v2['type'] == 'bool':
                     if isinstance(v2['default'], str):

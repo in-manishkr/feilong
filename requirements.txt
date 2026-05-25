@@ -6,3 +6,6 @@ Routes>=2.2 # MIT
 six>=1.9.0 # MIT
 WebOb>=1.2.3 # MIT
 PyYAML>=3.10
+SQLAlchemy>=1.4.0,<2.0.0 # MIT
+alembic>=1.7.0 # MIT
+PyMySQL>=1.0.0 # MIT - For MySQL/MariaDB support
