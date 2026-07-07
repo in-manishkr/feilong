@@ -84,6 +84,10 @@ class ZvmSdkGetPchidTestCase(base.ScriptsTestCase):
         # mock fcp_mgr
         mock_fcg_mgr = Mock()
         mock_init_fcp_mgr.return_value = mock_fcg_mgr
+        # stale_fcp_count is set by FCPManager.__init__()
+        # (via sync_db()) as a side effect of construction; mock it here
+        # since FCPManager itself is fully mocked in this test.
+        mock_fcg_mgr.stale_fcp_count = 0
         # mock commons
         mock_cps_sn.return_value = 'fake_cpc_sn'
         mock_cpc_name.return_value = 'fake_cpc_name'
@@ -100,6 +104,7 @@ class ZvmSdkGetPchidTestCase(base.ScriptsTestCase):
                   'cpc_name': 'fake_cpc_name',
                   'hypervisor_hostname': 'fake_zvm',
                   'lpar': 'fake_lpar',
+                  'reconciled_count': 0,
                   "pchids": [
                       {
                           "pchid": "0240",
@@ -129,13 +134,16 @@ class ZvmSdkGetPchidTestCase(base.ScriptsTestCase):
                   ]}
         result = TEST_MODULE.get_fcp_devices_per_pchid()
         self.assertDictEqual(expect, result)
-        # case2: all PCHIDs without inuse FCP
+        # case2: all PCHIDs without inuse FCP, and some stale FCPs were
+        # reconciled during this sync
+        mock_fcg_mgr.stale_fcp_count = 2
         mock_fcg_mgr.db.get_pchids_of_all_inuse_fcp_devices.return_value = {}
         mock_fcg_mgr.db.get_pchids_from_all_fcp_templates.return_value = ['0260', '0240']
         expect = {'cpc_sn': 'fake_cpc_sn',
                   'cpc_name': 'fake_cpc_name',
                   'hypervisor_hostname': 'fake_zvm',
                   'lpar': 'fake_lpar',
+                  'reconciled_count': 2,
                   "pchids": [{
                           "pchid": "0240",
                           "fcp_devices": "",
@@ -150,12 +158,14 @@ class ZvmSdkGetPchidTestCase(base.ScriptsTestCase):
         result = TEST_MODULE.get_fcp_devices_per_pchid()
         self.assertDictEqual(expect, result)
         # case3: no FCP devices / PCHIDs in any FCP template
+        mock_fcg_mgr.stale_fcp_count = 0
         mock_fcg_mgr.db.get_pchids_of_all_inuse_fcp_devices.return_value = {}
         mock_fcg_mgr.db.get_pchids_from_all_fcp_templates.return_value = []
         expect = {'cpc_sn': 'fake_cpc_sn',
                   'cpc_name': 'fake_cpc_name',
                   'hypervisor_hostname': 'fake_zvm',
                   'lpar': 'fake_lpar',
+                  'reconciled_count': 0,
                   "pchids": []}
         result = TEST_MODULE.get_fcp_devices_per_pchid()
         self.assertDictEqual(expect, result)

@@ -19,6 +19,7 @@
 import abc
 import re
 import shutil
+import time
 import uuid
 import six
 import threading
@@ -533,6 +534,9 @@ class FCPManager(object):
         self._fcp_path_mapping = {}
         self.db = database.FCPDbOperator()
         self._smtclient = smtclient.get_smtclient()
+        # Count of stale FCPs reconciled by the last sync pass; exposed
+        # for observability (e.g. zvmsdk-getpchid reports it).
+        self.stale_fcp_count = 0
         # Sync FCP DB
         self.sync_db()
         # Get available channel-paths from linux command lschp and log the info
@@ -540,8 +544,15 @@ class FCPManager(object):
 
     def sync_db(self):
         """Sync FCP DB with the FCP info queried from zVM"""
-        with zvmutils.ignore_errors():
+        try:
             self._sync_db_with_zvm()
+        except Exception:
+            # Don't propagate: this runs on every FCPManager() construction
+            # and must not blow up the caller. Log with a traceback instead
+            # of swallowing silently, so a failed pass is still visible.
+            LOG.exception("Failed to sync FCP database with z/VM. FCP "
+                          "records may be stale until the next successful "
+                          "sync.")
 
     def _get_all_fcp_info(self, assigner_id, status=None):
         fcp_info = self._smtclient.get_fcp_info_by_status(assigner_id, status)
@@ -883,13 +894,17 @@ class FCPManager(object):
         example (key=FCP)
         {
             'fcp_id': (fcp_id, userid, connections, reserved, wwpn_npiv,
-                       wwpn_phy, chpid, pchid, state, owner, tmpl_id),
+                       wwpn_phy, chpid, pchid, state, owner, tmpl_id,
+                       reserved_at),
             '1a06':   ('1a06', 'C2WDL003', 2, 1, 'c05076ddf7000002',
-                       'c05076ddf7001d81', 27, '02e4', 'active', 'C2WDL003', ''),
+                       'c05076ddf7001d81', 27, '02e4', 'active', 'C2WDL003', '',
+                       1700000000.0),
             '1b08':   ('1b08', 'C2WDL003', 2, 1, 'c05076ddf7000002',
-                     'c05076ddf7001d81', 27, '02e4', 'active', 'C2WDL003', ''),
+                     'c05076ddf7001d81', 27, '02e4', 'active', 'C2WDL003', '',
+                     1700000000.0),
             '1c08':   ('1c08', 'C2WDL003', 2, 1, 'c05076ddf7000002',
-                     'c05076ddf7001d81', 27, '02e4', 'active', 'C2WDL003', ''),
+                     'c05076ddf7001d81', 27, '02e4', 'active', 'C2WDL003', '',
+                     1700000000.0),
         }
         """
 
@@ -955,10 +970,10 @@ class FCPManager(object):
             for fcp in del_fcp_set:
                 # example of a FCP record in fcp_dict_in_db
                 # (fcp_id, userid, connections, reserved, wwpn_npiv,
-                #  wwpn_phy, chpid, pchid, state, owner, tmpl_id)
+                #  wwpn_phy, chpid, pchid, state, owner, tmpl_id, reserved_at)
                 (fcp_id, userid, connections, reserved, wwpn_npiv_db,
                  wwpn_phy_db, chpid_db, pchid_db, fcp_state_db,
-                 fcp_owner_db, tmpl_id) = fcp_dict_in_db[fcp]
+                 fcp_owner_db, tmpl_id, reserved_at) = fcp_dict_in_db[fcp]
                 if connections == 0 and reserved == 0:
                     fcp_ids_secure_to_delete.add(fcp)
                 else:
@@ -981,13 +996,22 @@ class FCPManager(object):
             LOG.info("FCP devices exist in both FCP table and "
                      "z/VM: {}".format(inter_set))
             fcp_ids_need_update = set()
+            # FCPs stale according to our own DB (reserved/attached
+            # longer than the grace period) that z/VM's live state shows
+            # aren't actually owned by the recorded assigner. Both checks
+            # are required: grace period alone could reclaim an FCP still
+            # mid-attach, and ground truth alone could reclaim one freshly
+            # reserved but not dedicated yet.
+            stale_fcp_ids = set()
+            now = time.time()
+            grace_period = CONF.volume.fcp_reserve_grace_period
             for fcp in inter_set:
                 # example of a FCP record in fcp_dict_in_db
                 # (fcp_id, userid, connections, reserved, wwpn_npiv,
-                #  wwpn_phy, chpid, pchid, state, owner, tmpl_id)
+                #  wwpn_phy, chpid, pchid, state, owner, tmpl_id, reserved_at)
                 (fcp_id, userid, connections, reserved, wwpn_npiv_db,
                  wwpn_phy_db, chpid_db, pchid_db, fcp_state_db,
-                 fcp_owner_db, tmpl_id) = fcp_dict_in_db[fcp]
+                 fcp_owner_db, tmpl_id, reserved_at) = fcp_dict_in_db[fcp]
                 # Get physical WWPN and NPIV WWPN queried from z/VM
                 wwpn_phy_zvm = fcp_dict_in_zvm[fcp].get_physical_port()
                 wwpn_npiv_zvm = fcp_dict_in_zvm[fcp].get_npiv_port()
@@ -1004,6 +1028,19 @@ class FCPManager(object):
                 # VM userid: if the FCP is attached to a VM
                 # A String "NONE": if the FCP is not attached
                 fcp_owner_zvm = fcp_dict_in_zvm[fcp].get_owner()
+                # Stale if DB's assigner disagrees with z/VM's live owner
+                # and the grace period has passed. reserved_at is backfilled
+                # on upgrade for any row with an assigner_id, so it should
+                # never be None here while userid is set; treat None as
+                # "old enough" anyway as a defensive fallback.
+                if userid and (fcp_owner_zvm or '').upper() != userid.upper():
+                    if reserved_at is None or (now - reserved_at) >= grace_period:
+                        stale_fcp_ids.add(fcp)
+                        LOG.warning(
+                            "FCP %s: DB shows assigner %s but z/VM owner "
+                            "is %s, past the %ss grace period; treating "
+                            "as stale." %
+                            (fcp_id, userid, fcp_owner_zvm, grace_period))
                 # Check WWPNs need update or not
                 if wwpn_npiv_db == '' or (connections == 0 and reserved == 0):
                     # The WWPNs are secure to be updated when:
@@ -1046,6 +1083,16 @@ class FCPManager(object):
             self.db.bulk_update_zvm_fcp_info_in_fcp_table(fcp_info_need_update)
             LOG.info("FCP devices need to update records in "
                      "fcp table: {}".format(fcp_info_need_update))
+
+            # stale_fcp_count is kept as an instance attribute (not just
+            # logged) so callers like zvmsdk-getpchid can report it too.
+            self.stale_fcp_count = len(stale_fcp_ids)
+            if stale_fcp_ids:
+                LOG.warning(
+                    "Reconciled %d stale FCP device(s) "
+                    "(reason=stale_reservation): %s" %
+                    (len(stale_fcp_ids), sorted(stale_fcp_ids)))
+                self.db.unreserve_fcps(stale_fcp_ids, clear_connections=True)
 
     def _sync_db_with_zvm(self):
         """Sync FCP DB with the FCP info queried from zVM"""
@@ -1997,6 +2044,11 @@ class FCPVolumeManager(object):
 
     def _dedicate_fcp(self, fcp, assigner_id):
         self._smtclient.dedicate_device(assigner_id, fcp, fcp, 0)
+        # Eagerly refresh cached state/owner for accuracy; best-effort
+        # so a DB hiccup can't fail a dedicate that already succeeded.
+        with zvmutils.ignore_errors():
+            self.db.bulk_update_state_in_fcp_table(
+                [fcp], 'active', assigner_id.lower())
 
     def _add_disks(self, fcp_list, assigner_id, target_wwpns, target_lun,
                    multipath, os_version, mount_point):
@@ -2128,13 +2180,21 @@ class FCPVolumeManager(object):
             # 1. Although the fcp devices in fcp_list were already reserved by get_volume_connector,
             #    in case some concurrent thread did _rollback_reserved_fcp_devices later,
             #    here need to reserve those FCP devices in DB again.
-            self.fcp_mgr.reserve_fcp_devices(fcp_list, assigner_id, fcp_template_id)
             # 2. increase connections by 1 and set assigner_id.
             # fcp_connections examples:
             # {'1a10': 1, '1b10': 1} => attaching 1st volume
             # {'1a10': 2, '1b10': 2} => attaching 2nd volume
             # {'1a10': 2, '1b10': 1} => connections differ in abnormal case (due to bug)
             # the values are the connections of the FCP device
+            #
+            # Keep these as two separate transactions (each call commits on
+            # its own): sharing one get_fcp_conn() here would roll back the
+            # reserve too if increase_fcp_connections fails, which breaks
+            # do_rollback=False's contract of keeping whatever succeeded.
+            # The grace period already makes a sync transiently observing
+            # reserved=1, connections=0 harmless (still within grace, so not
+            # treated as stale), so nothing needs the two writes atomic.
+            self.fcp_mgr.reserve_fcp_devices(fcp_list, assigner_id, fcp_template_id)
             fcp_connections = self.fcp_mgr.increase_fcp_connections(fcp_list, assigner_id)
             LOG.info("The connections of FCP devices after "
                      "being increased is: {}.".format(fcp_connections))
@@ -2386,6 +2446,12 @@ class FCPVolumeManager(object):
             else:
                 # raise exception
                 raise
+        # Reached on success or the ignorable "already undedicated" case --
+        # both mean the FCP is genuinely free, so refresh state/owner here
+        # too. Skipped on a real failure above (re-raised), since we
+        # don't know the true state then.
+        with zvmutils.ignore_errors():
+            self.db.bulk_update_state_in_fcp_table([fcp], 'free', 'none')
 
     def _remove_disks(self, fcp_list, assigner_id, target_wwpns, target_lun,
                       multipath, os_version, mount_point, connections):

@@ -521,6 +521,18 @@ tell SDK where to store the database files, make sure the process
 running SDK is able to read write and execute the directory.
 '''
         ),
+    Opt('connection_timeout',
+        section='database',
+        default=30,
+        opt_type='int',
+        help='''
+Seconds a SQLite connection waits for a lock before raising "database is
+locked" (passed as sqlite3.connect()'s timeout). Raised from the driver
+default of 5s because sdkserver and standalone scripts (e.g.
+zvmsdk-getpchid) each open their own connection to the same DB file, so
+some contention is routine, not exceptional.
+'''
+        ),
     Opt('refresh_bootmap_timeout',
         section='volume',
         default=1200,
@@ -569,6 +581,22 @@ Possible value:
 1 : use get_fcp_pair_with_same_index
 '''
       ),
+    Opt('fcp_reserve_grace_period',
+        section='volume',
+        default=1800,
+        opt_type='int',
+        help='''
+Seconds an FCP device may stay marked 'reserved' before
+sync_fcp_table_with_zvm() will clean it up as stale. A device is only
+cleaned up once BOTH are true: this grace period has passed, AND z/VM's
+live state shows it isn't actually dedicated to the VM our DB thinks
+owns it. The grace period alone isn't enough, since a freshly reserved
+device is briefly and legitimately not dedicated yet before z/VM catches
+up; without it a still-in-use device could be handed to a second VM.
+Default 1800s (30 min) should cover even a slow reserve-to-dedicate
+handoff.
+'''
+        ),
  Opt('force_capture_disk',
         section='zvm',
         required=False,

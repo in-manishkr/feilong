@@ -22,6 +22,7 @@ import os
 import six
 import sqlite3
 import threading
+import time
 import uuid
 import json
 import itertools
@@ -146,9 +147,38 @@ def _init_db_conn(db_file):
     if not os.path.exists(db_dir):
         os.makedirs(db_dir, _DIR_MODE)
     database = os.path.join(db_dir, db_file)
-    return sqlite3.connect(database,
+    # timeout: how long this connection will wait for a lock held by
+    # another connection/process on the same database file before
+    # raising "database is locked", instead of the sqlite3 driver's
+    # default of 5 seconds. The sdkserver daemon and standalone scripts
+    # that use the same SDK databases (e.g. zvmsdk-getpchid, invoked by
+    # icic-sync-fcp) each open their own independent connection to the
+    # same file, so routine, short-lived contention between them is
+    # expected, not exceptional.
+    conn = sqlite3.connect(database,
                            check_same_thread=False,
-                           isolation_level=None)
+                           isolation_level=None,
+                           timeout=CONF.database.connection_timeout)
+    # WAL (write-ahead-log) journal mode lets a reader/writer on this
+    # connection avoid blocking, or being blocked by, another process's
+    # connection to the same file in the common case, falling back to
+    # the timeout above only for genuine writer-vs-writer contention.
+    # This is a property persisted in the database file's own header, so
+    # it only needs to take effect once per file, but re-issuing it on
+    # every connection is cheap and keeps upgraded-from-older-release
+    # databases (still in the default rollback-journal mode) covered too.
+    conn.execute("PRAGMA journal_mode=WAL")
+    # synchronous=NORMAL is the standard, safe pairing for WAL mode (per
+    # SQLite's own documentation) and matters a lot here: WAL's default
+    # synchronous=FULL forces an fsync on every single commit, and this
+    # code issues many small, individual transactions (get_fcp_conn() and
+    # friends commit per call). Measured locally: switching to WAL
+    # without this made the unit test suite ~40x slower (112s vs ~2.5s)
+    # purely from fsync overhead; NORMAL removes that overhead while
+    # still being crash-safe under WAL (unlike NORMAL with the older
+    # rollback-journal mode, where it can lose the most recent commit).
+    conn.execute("PRAGMA synchronous=NORMAL")
+    return conn
 
 
 class NetworkDbOperator(object):
@@ -329,6 +359,13 @@ class FCPDbOperator(object):
         #             allocated, not to which FCP Multipath Template this FCP
         #             device belong. because a FCP device may belong
         #             to multiple FCP Multipath Templates.
+        #   reserved_at: epoch timestamp of when 'reserved' was last set
+        #             to 1. NULL only if never reserved (rows with an
+        #             assigner_id get backfilled to the upgrade time when
+        #             this column is added). Used to avoid reclaiming a
+        #             reservation that's still in flight. Added via
+        #             ALTER TABLE below, since CREATE TABLE IF NOT EXISTS
+        #             won't add it to an existing table.
         fcp_info_tables['fcp'] = (
             "CREATE TABLE IF NOT EXISTS fcp("
             "fcp_id         char(4)     NOT NULL COLLATE NOCASE,"
@@ -396,29 +433,58 @@ class FCPDbOperator(object):
             for table_name in fcp_info_tables:
                 create_table_sql = fcp_info_tables[table_name]
                 conn.execute(create_table_sql)
+            # Add 'reserved_at' if missing (e.g. upgrading an older
+            # table). ALTER TABLE ADD COLUMN is metadata-only, so this is
+            # safe to check on every start.
+            existing_columns = {row['name'] for row in
+                                conn.execute("PRAGMA table_info(fcp)").fetchall()}
+            if 'reserved_at' not in existing_columns:
+                conn.execute(
+                    "ALTER TABLE fcp ADD COLUMN reserved_at REAL DEFAULT NULL")
+                # Backfill: give pre-existing reserved rows a fresh grace
+                # period instead of leaving reserved_at NULL, which the
+                # stale-check treats as already-expired. Without this, a
+                # row reserved but not yet dedicated at the moment of
+                # upgrade could be reconciled as stale on the very next
+                # sync pass.
+                conn.execute(
+                    "UPDATE fcp SET reserved_at=? WHERE assigner_id != ''",
+                    (time.time(),))
+                LOG.info("Added 'reserved_at' column to the FCP database "
+                         "and backfilled it for existing reservations.")
         LOG.info("FCP database initialized.")
 
     #########################################################
     #                DML for Table fcp                      #
     #########################################################
-    def unreserve_fcps(self, fcp_ids):
+    def unreserve_fcps(self, fcp_ids, clear_connections=False):
+        """Release a claim on FCP devices: clears reserved, assigner_id,
+        tmpl_id and reserved_at. Pass clear_connections=True to also zero
+        out connections, for stale devices that may still show
+        connections>0 from a VM that no longer exists. Normal callers
+        leave it False and are expected to only unreserve FCPs whose
+        connections are already 0.
+        """
         if not fcp_ids:
             return
-        fcp_update_info = []
-        for fcp_id in fcp_ids:
-            fcp_update_info.append((fcp_id,))
+        fcp_update_info = [(fcp_id,) for fcp_id in fcp_ids]
+        sql = "UPDATE fcp SET reserved=0, assigner_id='', tmpl_id='', reserved_at=NULL"
+        if clear_connections:
+            sql += ", connections=0"
+        sql += " WHERE fcp_id=?"
         with get_fcp_conn() as conn:
-            conn.executemany("UPDATE fcp SET reserved=0, tmpl_id='' "
-                             "WHERE fcp_id=?", fcp_update_info)
+            conn.executemany(sql, fcp_update_info)
 
     def reserve_fcps(self, fcp_ids, assigner_id, fcp_template_id):
+        reserved_at = time.time()
         fcp_update_info = []
         for fcp_id in fcp_ids:
             fcp_update_info.append(
-                (assigner_id, fcp_template_id, fcp_id))
+                (assigner_id, fcp_template_id, reserved_at, fcp_id))
         with get_fcp_conn() as conn:
             conn.executemany("UPDATE fcp "
-                             "SET reserved=1, assigner_id=?, tmpl_id=? "
+                             "SET reserved=1, assigner_id=?, tmpl_id=?, "
+                             "reserved_at=? "
                              "WHERE fcp_id=?", fcp_update_info)
 
     def bulk_insert_zvm_fcp_info_into_fcp_table(self, fcp_info_list: list):
@@ -479,25 +545,43 @@ class FCPDbOperator(object):
                              "fcp_id=?", data_to_update)
 
     def bulk_update_state_in_fcp_table(self, fcp_id_list: list,
-                                       new_state: str):
-        """Update multiple records' comments to update the state to nofound.
+                                       new_state: str, new_owner=None):
+        """Update state (and optionally owner) for a list of FCPs. Used
+        for the bulk 'notfound' case, and for eagerly refreshing a single
+        FCP's state/owner right after dedicate/undedicate (pass a
+        one-item list) for point-in-time accuracy. Not relied on for
+        correctness: the periodic sync refreshes these columns from
+        z/VM regardless.
         """
-        data_to_update = list()
-        for id in fcp_id_list:
-            new_record = [new_state, id]
-            data_to_update.append(new_record)
+        if new_owner is None:
+            data = [(new_state, fcp_id) for fcp_id in fcp_id_list]
+            sql = "UPDATE fcp SET state=? WHERE fcp_id=?"
+        else:
+            data = [(new_state, new_owner, fcp_id) for fcp_id in fcp_id_list]
+            sql = "UPDATE fcp SET state=?, owner=? WHERE fcp_id=?"
         with get_fcp_conn() as conn:
-            conn.executemany("UPDATE fcp set state=? "
-                             "WHERE fcp_id=?", data_to_update)
+            conn.executemany(sql, data)
 
     def reset_fcps_of_assigner(self, userid):
-        """Reset fcp records for a given assigner."""
+        """Reset all fcp records for a given assigner, e.g. on VM delete.
+        Also clears state/owner: the VM's directory entry is already gone
+        by the time this runs, so any dedication to it is gone too.
+
+        :return count: (int) number of FCP records reset.
+        """
         with get_fcp_conn() as conn:
-            conn.execute("UPDATE fcp SET assigner_id='', reserved=0, "
-                         "connections=0, tmpl_id='' WHERE assigner_id=?",
-                         (userid,))
-            LOG.debug("FCP records for user %s are reset in "
-                      "fcp table" % userid)
+            cursor = conn.execute(
+                "UPDATE fcp SET assigner_id='', reserved=0, "
+                "connections=0, tmpl_id='', reserved_at=NULL, "
+                "state='free', owner='none' "
+                "WHERE assigner_id=?", (userid,))
+            count = cursor.rowcount
+            if count > 0:
+                LOG.info("Reconciled %d stale FCP device(s) "
+                        "(reason=vm_deleted) for user %s" % (count, userid))
+            else:
+                LOG.debug("No FCP records to reset for user %s" % userid)
+            return count
 
     def get_all_fcps_of_assigner(self, assigner_id=None):
         """Get dict of all fcp records of specified assigner.
@@ -505,11 +589,11 @@ class FCPDbOperator(object):
         Format of return is like :
         [
           (fcp_id, userid, connections, reserved, wwpn_npiv, wwpn_phy,
-           chpid, pchid, state, owner, tmpl_id),
+           chpid, pchid, state, owner, tmpl_id, reserved_at),
           ('283c', 'user1', 2, 1, 'c05076ddf7000002', 'c05076ddf7001d81',
-           '27', '02e4', 'active', 'user1', ''),
+           '27', '02e4', 'active', 'user1', '', 1700000000.0),
           ('483c', 'user2', 0, 0, 'c05076ddf7000001', 'c05076ddf7001d82',
-           '27', '02e4', 'free', 'NONE', '')
+           '27', '02e4', 'free', 'NONE', '', None)
         ]
         """
         with get_fcp_conn() as conn:
@@ -517,13 +601,13 @@ class FCPDbOperator(object):
                 result = conn.execute("SELECT fcp_id, assigner_id, "
                                       "connections, reserved, wwpn_npiv, "
                                       "wwpn_phy, chpid, pchid, state, owner, "
-                                      "tmpl_id FROM fcp WHERE "
+                                      "tmpl_id, reserved_at FROM fcp WHERE "
                                       "assigner_id=?", (assigner_id,))
             else:
                 result = conn.execute("SELECT fcp_id, assigner_id, "
                                       "connections, reserved, wwpn_npiv, "
                                       "wwpn_phy, chpid, pchid, state, owner, "
-                                      "tmpl_id FROM fcp")
+                                      "tmpl_id, reserved_at FROM fcp")
             fcp_info = result.fetchall()
             if not fcp_info:
                 if assigner_id:

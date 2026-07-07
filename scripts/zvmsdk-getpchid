@@ -93,12 +93,16 @@ def get_fcp_devices_per_pchid():
                     "fcp_devices": "1B02, 1B05",
                     "fcp_devices_count": 2
                 }
-            ]
+            ],
+            "reconciled_count": 0
         }
     """
 
-    # init FCPManager, which sync FCP DB with the FCP info queried from zVM
+    # init FCPManager, which syncs FCP DB with info queried from zVM and
+    # reconciles stale FCPs as a side effect; capture the count so
+    # icic-sync-fcp can log it too.
     fcp_mgr = volumeop.FCPManager()
+    reconciled_count = fcp_mgr.stale_fcp_count
     # put all related DB queries in one DB session
     with database.get_fcp_conn():
         # get the PCHIDs of all the FCP devices
@@ -127,6 +131,8 @@ def get_fcp_devices_per_pchid():
     LOG.info("all pchids in FCP multipath templates: {}".format(all_pchids))
     LOG.info("inuse pchids in FCP multipath templates: {}".format(inuse_pchids))
     LOG.info("unused pchids in FCP multipath templates: {}".format(unuse_pchids))
+    LOG.info("stale FCP device(s) reconciled during this run: {}".format(
+        reconciled_count))
     # get zhypinfo
     zhypinfo = utils.get_zhypinfo()
     cpc_sn = utils.get_cpc_sn(zhypinfo=zhypinfo)
@@ -138,7 +144,8 @@ def get_fcp_devices_per_pchid():
                'cpc_name': cpc_name,
                'hypervisor_hostname': hypervisor_hostname,
                'lpar': lpar,
-               'pchids': []}
+               'pchids': [],
+               'reconciled_count': reconciled_count}
     # append into pchids ordered by pchid No.
     for pd in all_pchids:
         item = {'pchid': pd}

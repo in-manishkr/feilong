@@ -2586,6 +2586,14 @@ class SMTClient(object):
     def delete_vm(self, userid):
         self.delete_userid(userid)
 
+        # Clear FCP records right after delete_userid() succeeds -- that's
+        # when the VM's z/VM directory entry, and any FCP dedication to
+        # it, is confirmed gone. Best-effort (don't reraise) so a later,
+        # unrelated failure (e.g. vswitch revoke) can't skip this step;
+        # sync_fcp_table_with_zvm() is the backstop either way.
+        with zvmutils.ignore_errors():
+            self._FCPDbOperator.reset_fcps_of_assigner(userid)
+
         # remove userid from smapi namelist
         self.namelist_remove(zvmutils.get_namelist(), userid)
 
@@ -2606,11 +2614,6 @@ class SMTClient(object):
         action = "delete network record for user %s" % userid
         with zvmutils.log_and_reraise_sdkbase_error(action):
             self._NetDbOperator.switch_delete_record_for_userid(userid)
-
-        # cleanup db records from FCP table
-        action = "delete FCP records for user %s" % userid
-        with zvmutils.log_and_reraise_sdkbase_error(action):
-            self._FCPDbOperator.reset_fcps_of_assigner(userid)
 
         # cleanup persistent folder for guest
         self._pathutils.remove_guest_path(userid)
