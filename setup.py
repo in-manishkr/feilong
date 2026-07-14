@@ -44,7 +44,13 @@ setuptools.setup(
             'volumeops/templates/sles_detach_volume.j2',
             'volumeops/templates/ubuntu_attach_volume.j2',
             'volumeops/templates/ubuntu_detach_volume.j2'
-        ]
+        ],
+        'zvmsdk.db': [
+            'alembic/alembic.ini',
+            'alembic/env.py',
+            'alembic/script.py.mako',
+            'alembic/versions/*.py',
+        ],
     },
     classifiers=[
         "Intended Audience :: Information Technology",

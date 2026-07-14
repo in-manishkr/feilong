@@ -130,11 +130,17 @@ VOLUME_MULTI_PASS = 'MULTI'
 POWER_STATE_ON = u'on'
 POWER_STATE_OFF = u'off'
 
-DATABASE_VOLUME = 'sdk_volume.sqlite'
-DATABASE_NETWORK = 'sdk_network.sqlite'
-DATABASE_GUEST = 'sdk_guest.sqlite'
-DATABASE_IMAGE = 'sdk_image.sqlite'
-DATABASE_FCP = 'sdk_fcp.sqlite'
+# DEPRECATED (Phase 9): These per-table SQLite filenames are superseded by the
+# unified SQLAlchemy engine introduced in Phase 1.  They remain here only to
+# avoid breaking any third-party code that imports them for migration tooling.
+# They will be removed in a future major release.  Use zvmsdk.db.api instead.
+#
+# DATABASE_VOLUME has no corresponding operator or table; do not create one.
+DATABASE_VOLUME = 'sdk_volume.sqlite'   # unused — no volume operator exists
+DATABASE_NETWORK = 'sdk_network.sqlite'  # deprecated — use zvmsdk.db.api
+DATABASE_GUEST = 'sdk_guest.sqlite'     # deprecated — use zvmsdk.db.api
+DATABASE_IMAGE = 'sdk_image.sqlite'     # deprecated — use zvmsdk.db.api
+DATABASE_FCP = 'sdk_fcp.sqlite'         # deprecated — use zvmsdk.db.api
 
 IMAGE_TYPE = {
     'DEPLOY': 'netboot',

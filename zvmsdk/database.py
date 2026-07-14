@@ -19,162 +19,151 @@
 import contextlib
 import random
 import os
-import six
-import sqlite3
-import threading
 import uuid
 import json
 import itertools
 
+from sqlalchemy import text, bindparam
+
 from zvmsdk import config
-from zvmsdk import constants as const
 from zvmsdk import exception
 from zvmsdk import log
 from zvmsdk import utils
+from zvmsdk.db import api as db_api
+from zvmsdk.db.api import get_connection
 
 
 CONF = config.CONF
 LOG = log.LOG
 
 
-_DIR_MODE = 0o755
-_NETWORK_CONN = None
-_IMAGE_CONN = None
-_GUEST_CONN = None
-_FCP_CONN = None
-_DBLOCK_VOLUME = threading.RLock()
-_DBLOCK_NETWORK = threading.RLock()
-_DBLOCK_IMAGE = threading.RLock()
-_DBLOCK_GUEST = threading.RLock()
-_DBLOCK_FCP = threading.RLock()
+
+class _CompatRow:
+    """SQLAlchemy Row adapter that supports both positional (row[0]) and
+    string-key (row['col']) access, mirroring the sqlite3.Row behavior the
+    original code relied on."""
+    __slots__ = ('_row', '_mapping')
+
+    def __init__(self, row):
+        self._row = row
+        self._mapping = row._mapping
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self._row[key]
+        return self._mapping[key]
+
+    def __iter__(self):
+        return iter(self._row)
+
+    def __len__(self):
+        return len(self._row)
+
+    def __eq__(self, other):
+        if isinstance(other, (tuple, list)):
+            return tuple(self._row) == tuple(other)
+        if isinstance(other, _CompatRow):
+            return tuple(self._row) == tuple(other._row)
+        return NotImplemented
+
+    def __hash__(self):
+        return hash(tuple(self._row))
+
+    def keys(self):
+        return self._mapping.keys()
+
+
+def _fetchall(result):
+    """Wrap CursorResult.fetchall() returning _CompatRow objects."""
+    return [_CompatRow(r) for r in result.fetchall()]
+
+
+def _fetchone(result):
+    """Wrap CursorResult.fetchone() returning a _CompatRow or None."""
+    row = result.fetchone()
+    return _CompatRow(row) if row is not None else None
+
+
+def _node_filter(prefix=None):
+    """Return (sql_fragment, params) to scope a SELECT to the local node.
+
+    In local mode returns ("", {}) so callers can concatenate unconditionally.
+    In remote mode returns (" AND <col> = :node_id", {'node_id': ...}).
+    For queries without an existing WHERE clause, callers should replace
+    the leading " AND" with " WHERE", e.g.:
+        filter_sql, filter_params = _node_filter()
+        where = filter_sql.replace(" AND", " WHERE", 1)
+    """
+    if getattr(CONF.database, 'mode', 'local') == 'remote':
+        col = ('%s.compute_node_id' % prefix) if prefix else 'compute_node_id'
+        return " AND %s = :node_id" % col, {'node_id': db_api.get_compute_node_id()}
+    return "", {}
 
 
 @contextlib.contextmanager
 def get_network_conn():
-    global _NETWORK_CONN
-    if not _NETWORK_CONN:
-        _NETWORK_CONN = _init_db_conn(const.DATABASE_NETWORK)
-
-    _DBLOCK_NETWORK.acquire()
     try:
-        yield _NETWORK_CONN
+        with get_connection() as conn:
+            yield conn
+    except exception.SDKBaseException:
+        raise
     except Exception as err:
-        msg = "Execute SQL statements error: %s" % six.text_type(err)
+        msg = "Execute SQL statements error: %s" % str(err)
         LOG.error(msg)
         raise exception.SDKNetworkOperationError(rs=1, msg=msg)
-    finally:
-        _DBLOCK_NETWORK.release()
 
 
 @contextlib.contextmanager
 def get_image_conn():
-    global _IMAGE_CONN
-    if not _IMAGE_CONN:
-        _IMAGE_CONN = _init_db_conn(const.DATABASE_IMAGE)
-
-    _DBLOCK_IMAGE.acquire()
     try:
-        yield _IMAGE_CONN
+        with get_connection() as conn:
+            yield conn
+    except exception.SDKBaseException:
+        raise
     except Exception as err:
-        LOG.error("Execute SQL statements error: %s", six.text_type(err))
-        raise exception.SDKDatabaseException(msg=err)
-    finally:
-        _DBLOCK_IMAGE.release()
+        msg = "Execute SQL statements error: %s" % str(err)
+        LOG.error(msg)
+        raise exception.SDKDatabaseException(msg=msg)
 
 
 @contextlib.contextmanager
 def get_guest_conn():
-    global _GUEST_CONN
-    if not _GUEST_CONN:
-        _GUEST_CONN = _init_db_conn(const.DATABASE_GUEST)
-
-    _DBLOCK_GUEST.acquire()
     try:
-        yield _GUEST_CONN
+        with get_connection() as conn:
+            yield conn
+    except exception.SDKBaseException:
+        raise
     except Exception as err:
-        msg = "Execute SQL statements error: %s" % six.text_type(err)
+        msg = "Execute SQL statements error: %s" % str(err)
         LOG.error(msg)
         raise exception.SDKGuestOperationError(rs=1, msg=msg)
-    finally:
-        _DBLOCK_GUEST.release()
 
 
 @contextlib.contextmanager
 def get_fcp_conn():
-    global _FCP_CONN
-    if not _FCP_CONN:
-        _FCP_CONN = _init_db_conn(const.DATABASE_FCP)
-        # enable access columns by name
-        _FCP_CONN.row_factory = sqlite3.Row
-    _DBLOCK_FCP.acquire()
     try:
-        # sqlite DB not allow to start a transaction within a transaction,
-        # so, only begin a transaction when no other alive transaction
-        if not _FCP_CONN.in_transaction:
-            _FCP_CONN.execute("BEGIN")
-            skip_commit = False
-        else:
-            skip_commit = True
-        yield _FCP_CONN
-    except exception.SDKBaseException as err:
-        # rollback only if _FCP_CONN.execute("BEGIN")
-        # is invoked when entering the contextmanager
-        if not skip_commit:
-            _FCP_CONN.execute("ROLLBACK")
-        msg = "Got SDK exception in FCP DB operation: %s" % six.text_type(err)
-        LOG.error(msg)
+        with get_connection() as conn:
+            yield conn
+    except exception.SDKBaseException:
         raise
     except Exception as err:
-        # rollback only if _FCP_CONN.execute("BEGIN")
-        # is invoked when entering the contextmanager
-        if not skip_commit:
-            _FCP_CONN.execute("ROLLBACK")
-        msg = "Execute SQL statements error: %s" % six.text_type(err)
+        msg = "Execute SQL statements error: %s" % str(err)
         LOG.error(msg)
         raise exception.SDKGuestOperationError(rs=1, msg=msg)
-    else:
-        # commit only if _FCP_CONN.execute("BEGIN")
-        # is invoked when entering the contextmanager
-        if not skip_commit:
-            _FCP_CONN.execute("COMMIT")
-    finally:
-        _DBLOCK_FCP.release()
-
-
-def _init_db_conn(db_file):
-    db_dir = CONF.database.dir
-    if not os.path.exists(db_dir):
-        os.makedirs(db_dir, _DIR_MODE)
-    database = os.path.join(db_dir, db_file)
-    return sqlite3.connect(database,
-                           check_same_thread=False,
-                           isolation_level=None)
 
 
 class NetworkDbOperator(object):
 
     def __init__(self):
         self._module_id = 'network'
-        self._create_switch_table()
-
-    def _create_switch_table(self):
-        create_table_sql = ' '.join((
-                'create table if not exists switch (',
-                'userid       varchar(8)    COLLATE NOCASE,',
-                'interface    varchar(4)    COLLATE NOCASE,',
-                'switch       varchar(8)    COLLATE NOCASE,',
-                'port         varchar(128)  COLLATE NOCASE,',
-                'comments     varchar(128),',
-                'primary key (userid, interface));'))
-        with get_network_conn() as conn:
-            conn.execute(create_table_sql)
 
     def _get_switch_by_user_interface(self, userid, interface):
         with get_network_conn() as conn:
-            res = conn.execute("SELECT * FROM switch "
-                               "WHERE userid=? and interface=?",
-                               (userid, interface))
-            switch_record = res.fetchall()
+            res = conn.execute(
+                text("SELECT userid, interface, switch, port, comments FROM switch "
+                     "WHERE userid=:userid and interface=:interface"),
+                {'userid': userid, 'interface': interface})
+            switch_record = _fetchall(res)
 
         if len(switch_record) == 1:
             return switch_record[0]
@@ -184,16 +173,17 @@ class NetworkDbOperator(object):
     def switch_delete_record_for_userid(self, userid):
         """Remove userid switch record from switch table."""
         with get_network_conn() as conn:
-            conn.execute("DELETE FROM switch WHERE userid=?",
-                         (userid,))
+            conn.execute(text("DELETE FROM switch WHERE userid=:userid"),
+                         {'userid': userid})
             LOG.debug("Switch record for user %s is removed from "
                       "switch table" % userid)
 
     def switch_delete_record_for_nic(self, userid, interface):
         """Remove userid switch record from switch table."""
         with get_network_conn() as conn:
-            conn.execute("DELETE FROM switch WHERE userid=? and interface=?",
-                         (userid, interface))
+            conn.execute(
+                text("DELETE FROM switch WHERE userid=:userid and interface=:interface"),
+                {'userid': userid, 'interface': interface})
             LOG.debug("Switch record for user %s with nic %s is removed from "
                       "switch table" % (userid, interface))
 
@@ -201,8 +191,13 @@ class NetworkDbOperator(object):
                           switch=None, comments=None):
         """Add userid and nic name address into switch table."""
         with get_network_conn() as conn:
-            conn.execute("INSERT INTO switch VALUES (?, ?, ?, ?, ?)",
-                         (userid, interface, switch, port, comments))
+            conn.execute(
+                text("INSERT INTO switch"
+                     " (userid, interface, compute_node_id, switch, port, comments)"
+                     " VALUES (:userid, :interface, :node_id, :switch, :port, :comments)"),
+                {'userid': userid, 'interface': interface,
+                 'node_id': db_api.get_compute_node_id(),
+                 'switch': switch, 'port': port, 'comments': comments})
             LOG.debug("New record in the switch table: user %s, "
                       "nic %s, port %s" %
                       (userid, interface, port))
@@ -211,8 +206,13 @@ class NetworkDbOperator(object):
                              port=None, comments=None):
         """Add userid and interfaces and switch into switch table."""
         with get_network_conn() as conn:
-            conn.execute("INSERT INTO switch VALUES (?, ?, ?, ?, ?)",
-                         (userid, interface, switch, port, comments))
+            conn.execute(
+                text("INSERT INTO switch"
+                     " (userid, interface, compute_node_id, switch, port, comments)"
+                     " VALUES (:userid, :interface, :node_id, :switch, :port, :comments)"),
+                {'userid': userid, 'interface': interface,
+                 'node_id': db_api.get_compute_node_id(),
+                 'switch': switch, 'port': port, 'comments': comments})
             LOG.debug("New record in the switch table: user %s, "
                       "nic %s, switch %s" %
                       (userid, interface, switch))
@@ -230,44 +230,45 @@ class NetworkDbOperator(object):
 
         if switch is not None:
             with get_network_conn() as conn:
-                conn.execute("UPDATE switch SET switch=? "
-                             "WHERE userid=? and interface=?",
-                             (switch, userid, interface))
+                conn.execute(
+                    text("UPDATE switch SET switch=:switch "
+                         "WHERE userid=:userid and interface=:interface"),
+                    {'switch': switch, 'userid': userid, 'interface': interface})
                 LOG.debug("Set switch to %s for user %s with nic %s "
                           "in switch table" %
                           (switch, userid, interface))
         else:
             with get_network_conn() as conn:
-                conn.execute("UPDATE switch SET switch=NULL "
-                             "WHERE userid=? and interface=?",
-                             (userid, interface))
+                conn.execute(
+                    text("UPDATE switch SET switch=NULL "
+                         "WHERE userid=:userid and interface=:interface"),
+                    {'userid': userid, 'interface': interface})
                 LOG.debug("Set switch to None for user %s with nic %s "
                           "in switch table" %
                           (userid, interface))
 
     def _parse_switch_record(self, switch_list):
-        # Map each switch record to be a dict, with the key is the field name
-        # in switch DB
-        switch_keys_list = ['userid', 'interface', 'switch',
-                            'port', 'comments']
-
-        switch_result = []
-        for item in switch_list:
-            switch_item = dict(zip(switch_keys_list, item))
-            switch_result.append(switch_item)
-        return switch_result
+        return [dict(item._mapping) for item in switch_list]
 
     def switch_select_table(self):
+        filter_sql, filter_params = _node_filter()
+        where = filter_sql.replace(" AND", " WHERE", 1)
         with get_network_conn() as conn:
-            result = conn.execute("SELECT * FROM switch")
-            nic_settings = result.fetchall()
+            result = conn.execute(text(
+                "SELECT userid, interface, switch, port, comments FROM switch" + where),
+                filter_params)
+            nic_settings = _fetchall(result)
         return self._parse_switch_record(nic_settings)
 
     def switch_select_record_for_userid(self, userid):
+        filter_sql, filter_params = _node_filter()
+        params = {'userid': userid, **filter_params}
         with get_network_conn() as conn:
-            result = conn.execute("SELECT * FROM switch "
-                                  "WHERE userid=?", (userid,))
-            switch_info = result.fetchall()
+            result = conn.execute(
+                text("SELECT userid, interface, switch, port, comments FROM switch"
+                     " WHERE userid=:userid" + filter_sql),
+                params)
+            switch_info = _fetchall(result)
         return self._parse_switch_record(switch_info)
 
     def switch_select_record(self, userid=None, nic_id=None, vswitch=None):
@@ -276,24 +277,26 @@ class NetworkDbOperator(object):
             (vswitch is None)):
             return self.switch_select_table()
 
-        sql_cmd = "SELECT * FROM switch WHERE"
-        sql_var = []
+        filter_sql, filter_params = _node_filter()
+        clauses = []
+        params = {}
         if userid is not None:
-            sql_cmd += " userid=? and"
-            sql_var.append(userid)
+            clauses.append("userid=:userid")
+            params['userid'] = userid
         if nic_id is not None:
-            sql_cmd += " port=? and"
-            sql_var.append(nic_id)
+            clauses.append("port=:port")
+            params['port'] = nic_id
         if vswitch is not None:
-            sql_cmd += " switch=?"
-            sql_var.append(vswitch)
+            clauses.append("switch=:switch")
+            params['switch'] = vswitch
+        params.update(filter_params)
 
-        # remove the tailing ' and'
-        sql_cmd = sql_cmd.strip(' and')
+        sql_cmd = ("SELECT userid, interface, switch, port, comments FROM switch WHERE "
+                   + " AND ".join(clauses) + filter_sql)
 
         with get_network_conn() as conn:
-            result = conn.execute(sql_cmd, sql_var)
-            switch_list = result.fetchall()
+            result = conn.execute(text(sql_cmd), params)
+            switch_list = _fetchall(result)
 
         return self._parse_switch_record(switch_list)
 
@@ -302,101 +305,6 @@ class FCPDbOperator(object):
 
     def __init__(self):
         self._module_id = 'volume'
-        self._initialize_table()
-
-    def _initialize_table(self):
-        # fcp_info_tables:
-        #   map the table name to the corresponding SQL to create it
-        #   key is the name of table to be created
-        #   value is the SQL to be executed to create the table
-        fcp_info_tables = {}
-        # table for basic info of FCP devices
-        #   fcp_id: FCP device ID, the primary key
-        #   assigner_id: VM userid representing an unique VM,
-        #                it is allocated by zvmsdk and may differ with owner
-        #   connections: how many volumes connected to this FCP device,
-        #                0 means no assigner
-        #   reserved: 0 for not reserved by some operation
-        #   wwpn_npiv: NPIV WWPN
-        #   wwpn_phy: Physical WWPN
-        #   chpid: channel ID of FCP device
-        #   pchid: Physical channel ID of FCP device
-        #   state: FCP device status
-        #   owner: VM userid representing an unique VM,
-        #          it is read from z/VM hypervisor and
-        #          may differ with assigner_id
-        #   tmpl_id: indicate from which FCP Multipath Template this FCP device was
-        #             allocated, not to which FCP Multipath Template this FCP
-        #             device belong. because a FCP device may belong
-        #             to multiple FCP Multipath Templates.
-        fcp_info_tables['fcp'] = (
-            "CREATE TABLE IF NOT EXISTS fcp("
-            "fcp_id         char(4)     NOT NULL COLLATE NOCASE,"
-            "assigner_id    varchar(8)  NOT NULL DEFAULT '' COLLATE NOCASE,"
-            "connections    integer     NOT NULL DEFAULT 0,"
-            "reserved       integer     NOT NULL DEFAULT 0,"
-            "wwpn_npiv      varchar(16) NOT NULL DEFAULT '' COLLATE NOCASE,"
-            "wwpn_phy       varchar(16) NOT NULL DEFAULT '' COLLATE NOCASE,"
-            "chpid          char(2)     NOT NULL DEFAULT '' COLLATE NOCASE,"
-            "pchid          char(4)     NOT NULL DEFAULT '' COLLATE NOCASE,"
-            "state          varchar(8)  NOT NULL DEFAULT '' COLLATE NOCASE,"
-            "owner          varchar(8)  NOT NULL DEFAULT '' COLLATE NOCASE,"
-            "tmpl_id        varchar(32) NOT NULL DEFAULT '' COLLATE NOCASE,"
-            "PRIMARY KEY (fcp_id))")
-
-        # table for FCP Multipath Templates:
-        #   id: template id, the primary key
-        #   name: the name of the template
-        #   description: the description for this template
-        #   is_default: is this template the default one on this host or not
-        #       1/True for yes, 0/False for no
-        #       note: SQLite recognizes the keywords "TRUE" and "FALSE",
-        #       those keywords are saved in SQLite
-        #       as integer 1 and 0 respectively
-        #   min_fcp_paths_count:
-        #       the mimimum path count allowed when selecting
-        #       available FCP devices from the template,
-        #       one FCP device per path.
-        #       -1 means the count is the same as the path count of
-        #       the template defined in table template_fcp_mapping
-        fcp_info_tables['template'] = (
-            "CREATE TABLE IF NOT EXISTS template("
-            "id                   varchar(32)  NOT NULL COLLATE NOCASE,"
-            "name                 varchar(128) NOT NULL COLLATE NOCASE,"
-            "description          varchar(255) NOT NULL DEFAULT '' COLLATE NOCASE,"
-            "is_default           integer      NOT NULL DEFAULT 0,"
-            "min_fcp_paths_count  integer      NOT NULL DEFAULT -1,"
-            "PRIMARY KEY (id))")
-
-        # table for relationships between templates and storage providers:
-        #   sp_name: name of storage provider, the primary key
-        #   tmpl_id: template id
-        fcp_info_tables['template_sp_mapping'] = (
-            'CREATE TABLE IF NOT EXISTS template_sp_mapping('
-            'sp_name        varchar(128) NOT NULL COLLATE NOCASE,'
-            'tmpl_id        varchar(32)  NOT NULL COLLATE NOCASE,'
-            'PRIMARY KEY (sp_name))')
-
-        # table for relationships between templates and FCP devices:
-        #   fcp_id: the fcp device ID
-        #   tmpl_id: the template id
-        #   path: the path number, 0 means the FCP device is in path0
-        #         1 means the FCP devices is in path1, and so on.
-        #   composite primary key (fcp_id, tmpl_id)
-        fcp_info_tables['template_fcp_mapping'] = (
-            'CREATE TABLE IF NOT EXISTS template_fcp_mapping('
-            'fcp_id         char(4)     NOT NULL COLLATE NOCASE,'
-            'tmpl_id        varchar(32) NOT NULL COLLATE NOCASE,'
-            'path           integer     NOT NULL,'
-            'PRIMARY KEY (fcp_id, tmpl_id))')
-
-        # create all the tables
-        LOG.info("Initializing FCP database.")
-        with get_fcp_conn() as conn:
-            for table_name in fcp_info_tables:
-                create_table_sql = fcp_info_tables[table_name]
-                conn.execute(create_table_sql)
-        LOG.info("FCP database initialized.")
 
     #########################################################
     #                DML for Table fcp                      #
@@ -404,22 +312,21 @@ class FCPDbOperator(object):
     def unreserve_fcps(self, fcp_ids):
         if not fcp_ids:
             return
-        fcp_update_info = []
-        for fcp_id in fcp_ids:
-            fcp_update_info.append((fcp_id,))
+        records = [{'fcp_id': fcp_id} for fcp_id in fcp_ids]
         with get_fcp_conn() as conn:
-            conn.executemany("UPDATE fcp SET reserved=0, tmpl_id='' "
-                             "WHERE fcp_id=?", fcp_update_info)
+            conn.execute(
+                text("UPDATE fcp SET reserved=0, tmpl_id='' WHERE fcp_id=:fcp_id"),
+                records)
 
     def reserve_fcps(self, fcp_ids, assigner_id, fcp_template_id):
-        fcp_update_info = []
-        for fcp_id in fcp_ids:
-            fcp_update_info.append(
-                (assigner_id, fcp_template_id, fcp_id))
+        records = [{'assigner_id': assigner_id, 'tmpl_id': fcp_template_id,
+                    'fcp_id': fcp_id}
+                   for fcp_id in fcp_ids]
         with get_fcp_conn() as conn:
-            conn.executemany("UPDATE fcp "
-                             "SET reserved=1, assigner_id=?, tmpl_id=? "
-                             "WHERE fcp_id=?", fcp_update_info)
+            conn.execute(
+                text("UPDATE fcp SET reserved=1, assigner_id=:assigner_id, "
+                     "tmpl_id=:tmpl_id WHERE fcp_id=:fcp_id"),
+                records)
 
     def bulk_insert_zvm_fcp_info_into_fcp_table(self, fcp_info_list: list):
         """Insert multiple records into fcp table witch fcp info queried
@@ -434,20 +341,32 @@ class FCPDbOperator(object):
          ('1a08', 'c05076de33000355', 'c05076de33002641', '27', '02e4', 'active',
           'user2')]
         """
+        node_id = db_api.get_compute_node_id()
+        records = [{'fcp_id': r[0], 'node_id': node_id,
+                    'wwpn_npiv': r[1], 'wwpn_phy': r[2],
+                    'chpid': r[3], 'pchid': r[4], 'state': r[5], 'owner': r[6]}
+                   for r in fcp_info_list]
+        if not records:
+            return
         with get_fcp_conn() as conn:
-            conn.executemany("INSERT INTO fcp (fcp_id, wwpn_npiv, wwpn_phy, "
-                             "chpid, pchid, state, owner) "
-                             "VALUES (?, ?, ?, ?, ?, ?, ?)", fcp_info_list)
+            conn.execute(
+                text("INSERT INTO fcp"
+                     " (fcp_id, compute_node_id, wwpn_npiv, wwpn_phy,"
+                     "  chpid, pchid, state, owner)"
+                     " VALUES (:fcp_id, :node_id, :wwpn_npiv, :wwpn_phy,"
+                     "  :chpid, :pchid, :state, :owner)"),
+                records)
 
     def bulk_delete_from_fcp_table(self, fcp_id_list: list):
         """Delete multiple FCP records from fcp table
         The fcp_id_list is list of FCP IDs, for example:
         ['1a00', '1b01', '1c02']
         """
-        fcp_id_list = [(fcp_id,) for fcp_id in fcp_id_list]
+        if not fcp_id_list:
+            return
+        records = [{'fcp_id': fcp_id} for fcp_id in fcp_id_list]
         with get_fcp_conn() as conn:
-            conn.executemany("DELETE FROM fcp "
-                             "WHERE fcp_id=?", fcp_id_list)
+            conn.execute(text("DELETE FROM fcp WHERE fcp_id=:fcp_id"), records)
 
     def bulk_update_zvm_fcp_info_in_fcp_table(self, fcp_info_list: list):
         """Update multiple records with FCP info queried from z/VM.
@@ -461,41 +380,38 @@ class FCPDbOperator(object):
          ('1a08', 'c05076de33000355', 'c05076de33002641', '27', '02e4', 'active',
           'user2')]
         """
-        # transfer state and owner to a comment dict
-        # the key is the id of the FCP device, the value is a comment dict
-        # for example:
-        # {'1a07': {'state': 'free', 'owner': 'user1'},
-        #  '1a08': {'state': 'active', 'owner': 'user2'}}
-        data_to_update = list()
-        for fcp in fcp_info_list:
-            # change order of update data
-            # the new order is like:
-            #   (wwpn_npiv, wwpn_phy, chpid, pchid, state, owner, fcp_id)
-            new_record = list(fcp[1:]) + [fcp[0]]
-            data_to_update.append(new_record)
+        records = [{'wwpn_npiv': r[1], 'wwpn_phy': r[2], 'chpid': r[3],
+                    'pchid': r[4], 'state': r[5], 'owner': r[6], 'fcp_id': r[0]}
+                   for r in fcp_info_list]
+        if not records:
+            return
         with get_fcp_conn() as conn:
-            conn.executemany("UPDATE fcp SET wwpn_npiv=?, wwpn_phy=?, "
-                             "chpid=?, pchid=?, state=?, owner=? WHERE "
-                             "fcp_id=?", data_to_update)
+            conn.execute(
+                text("UPDATE fcp SET wwpn_npiv=:wwpn_npiv, wwpn_phy=:wwpn_phy, "
+                     "chpid=:chpid, pchid=:pchid, state=:state, owner=:owner "
+                     "WHERE fcp_id=:fcp_id"),
+                records)
 
     def bulk_update_state_in_fcp_table(self, fcp_id_list: list,
                                        new_state: str):
         """Update multiple records' comments to update the state to nofound.
         """
-        data_to_update = list()
-        for id in fcp_id_list:
-            new_record = [new_state, id]
-            data_to_update.append(new_record)
+        if not fcp_id_list:
+            return
+        records = [{'state': new_state, 'fcp_id': fcp_id}
+                   for fcp_id in fcp_id_list]
         with get_fcp_conn() as conn:
-            conn.executemany("UPDATE fcp set state=? "
-                             "WHERE fcp_id=?", data_to_update)
+            conn.execute(
+                text("UPDATE fcp SET state=:state WHERE fcp_id=:fcp_id"),
+                records)
 
     def reset_fcps_of_assigner(self, userid):
         """Reset fcp records for a given assigner."""
         with get_fcp_conn() as conn:
-            conn.execute("UPDATE fcp SET assigner_id='', reserved=0, "
-                         "connections=0, tmpl_id='' WHERE assigner_id=?",
-                         (userid,))
+            conn.execute(
+                text("UPDATE fcp SET assigner_id='', reserved=0, "
+                     "connections=0, tmpl_id='' WHERE assigner_id=:userid"),
+                {'userid': userid})
             LOG.debug("FCP records for user %s are reset in "
                       "fcp table" % userid)
 
@@ -512,19 +428,19 @@ class FCPDbOperator(object):
            '27', '02e4', 'free', 'NONE', '')
         ]
         """
+        filter_sql, filter_params = _node_filter()
+        _cols = ("SELECT fcp_id, assigner_id, connections, reserved, "
+                 "wwpn_npiv, wwpn_phy, chpid, pchid, state, owner, tmpl_id FROM fcp")
         with get_fcp_conn() as conn:
             if assigner_id:
-                result = conn.execute("SELECT fcp_id, assigner_id, "
-                                      "connections, reserved, wwpn_npiv, "
-                                      "wwpn_phy, chpid, pchid, state, owner, "
-                                      "tmpl_id FROM fcp WHERE "
-                                      "assigner_id=?", (assigner_id,))
+                params = {'assigner_id': assigner_id, **filter_params}
+                result = conn.execute(
+                    text(_cols + " WHERE assigner_id=:assigner_id" + filter_sql),
+                    params)
             else:
-                result = conn.execute("SELECT fcp_id, assigner_id, "
-                                      "connections, reserved, wwpn_npiv, "
-                                      "wwpn_phy, chpid, pchid, state, owner, "
-                                      "tmpl_id FROM fcp")
-            fcp_info = result.fetchall()
+                where = filter_sql.replace(" AND", " WHERE", 1)
+                result = conn.execute(text(_cols + where), filter_params)
+            fcp_info = _fetchall(result)
             if not fcp_info:
                 if assigner_id:
                     obj_desc = ("FCP record in fcp table belongs to "
@@ -538,12 +454,13 @@ class FCPDbOperator(object):
     def get_usage_of_fcp(self, fcp_id):
         connections = 0
         reserved = 0
+        filter_sql, filter_params = _node_filter()
         with get_fcp_conn() as conn:
-            result = conn.execute("SELECT assigner_id, reserved, "
-                                  "connections, tmpl_id "
-                                  "FROM fcp "
-                                  "WHERE fcp_id=?", (fcp_id,))
-            fcp_info = result.fetchone()
+            result = conn.execute(
+                text("SELECT assigner_id, reserved, connections, tmpl_id "
+                     "FROM fcp WHERE fcp_id=:fcp_id" + filter_sql),
+                {'fcp_id': fcp_id, **filter_params})
+            fcp_info = _fetchone(result)
             if not fcp_info:
                 msg = 'FCP with id: %s does not exist in DB.' % fcp_id
                 LOG.error(msg)
@@ -560,10 +477,12 @@ class FCPDbOperator(object):
     def update_usage_of_fcp(self, fcp, assigner_id, reserved, connections,
                             fcp_template_id):
         with get_fcp_conn() as conn:
-            conn.execute("UPDATE fcp SET assigner_id=?, reserved=?, "
-                         "connections=?, tmpl_id=? WHERE fcp_id=?",
-                         (assigner_id, reserved, connections,
-                          fcp_template_id, fcp))
+            conn.execute(
+                text("UPDATE fcp SET assigner_id=:assigner_id, reserved=:reserved, "
+                     "connections=:connections, tmpl_id=:tmpl_id WHERE fcp_id=:fcp_id"),
+                {'assigner_id': assigner_id, 'reserved': reserved,
+                 'connections': connections, 'tmpl_id': fcp_template_id,
+                 'fcp_id': fcp})
 
     def increase_connections_by_assigner(self, fcp, assigner_id):
         """Increase connections of the given FCP device
@@ -573,10 +492,11 @@ class FCPDbOperator(object):
         :return connections: (dict) the connections of the FCP device
         """
         with get_fcp_conn() as conn:
-            result = conn.execute("SELECT connections FROM fcp "
-                                  "WHERE fcp_id=? AND assigner_id=?",
-                                  (fcp, assigner_id))
-            fcp_info = result.fetchone()
+            result = conn.execute(
+                text("SELECT connections FROM fcp "
+                     "WHERE fcp_id=:fcp_id AND assigner_id=:assigner_id"),
+                {'fcp_id': fcp, 'assigner_id': assigner_id})
+            fcp_info = _fetchone(result)
             if not fcp_info:
                 msg = 'FCP with id: %s does not exist in DB.' % fcp
                 LOG.error(msg)
@@ -585,12 +505,16 @@ class FCPDbOperator(object):
                                                        modID=self._module_id)
             connections = fcp_info['connections'] + 1
 
-            conn.execute("UPDATE fcp SET connections=? WHERE fcp_id=? "
-                         "AND assigner_id=?", (connections, fcp, assigner_id))
+            conn.execute(
+                text("UPDATE fcp SET connections=:connections "
+                     "WHERE fcp_id=:fcp_id AND assigner_id=:assigner_id"),
+                {'connections': connections, 'fcp_id': fcp,
+                 'assigner_id': assigner_id})
             # check the result
-            result = conn.execute("SELECT connections FROM fcp "
-                                  "WHERE fcp_id=?", (fcp,))
-            connections = result.fetchone()['connections']
+            result = conn.execute(
+                text("SELECT connections FROM fcp WHERE fcp_id=:fcp_id"),
+                {'fcp_id': fcp})
+            connections = _fetchone(result)['connections']
             return connections
 
     def decrease_connections(self, fcp):
@@ -600,10 +524,10 @@ class FCPDbOperator(object):
         :return connections: (dict) the connections of the FCP device
         """
         with get_fcp_conn() as conn:
-
-            result = conn.execute("SELECT connections FROM fcp "
-                                  "WHERE fcp_id=?", (fcp,))
-            fcp_list = result.fetchone()
+            result = conn.execute(
+                text("SELECT connections FROM fcp WHERE fcp_id=:fcp_id"),
+                {'fcp_id': fcp})
+            fcp_list = _fetchone(result)
             if not fcp_list:
                 msg = 'FCP with id: %s does not exist in DB.' % fcp
                 LOG.error(msg)
@@ -624,21 +548,24 @@ class FCPDbOperator(object):
                 LOG.warning("Warning: connections of fcp is negative",
                             fcp)
             # decrease connections by 1
-            conn.execute("UPDATE fcp SET connections=? "
-                         "WHERE fcp_id=?",
-                         (connections, fcp))
+            conn.execute(
+                text("UPDATE fcp SET connections=:connections WHERE fcp_id=:fcp_id"),
+                {'connections': connections, 'fcp_id': fcp})
             # check the result
-            result = conn.execute("SELECT connections FROM fcp "
-                                  "WHERE fcp_id=?", (fcp, ))
-            connections = result.fetchone()['connections']
+            result = conn.execute(
+                text("SELECT connections FROM fcp WHERE fcp_id=:fcp_id"),
+                {'fcp_id': fcp})
+            connections = _fetchone(result)['connections']
             return connections
 
     def get_connections_from_fcp(self, fcp):
         connections = 0
+        filter_sql, filter_params = _node_filter()
         with get_fcp_conn() as conn:
-            result = conn.execute("SELECT connections FROM fcp WHERE "
-                                  "fcp_id=?", (fcp,))
-            fcp_info = result.fetchone()
+            result = conn.execute(
+                text("SELECT connections FROM fcp WHERE fcp_id=:fcp_id" + filter_sql),
+                {'fcp_id': fcp, **filter_params})
+            fcp_info = _fetchone(result)
             if not fcp_info:
                 msg = 'FCP with id: %s does not exist in DB.' % fcp
                 LOG.error(msg)
@@ -650,36 +577,27 @@ class FCPDbOperator(object):
         return connections
 
     def get_all(self):
+        filter_sql, filter_params = _node_filter()
+        where = filter_sql.replace(" AND", " WHERE", 1)
         with get_fcp_conn() as conn:
-
-            result = conn.execute("SELECT fcp_id, "
-                                  "assigner_id, "
-                                  "connections, "
-                                  "reserved, "
-                                  "wwpn_npiv, "
-                                  "wwpn_phy, "
-                                  "chpid, "
-                                  "pchid, "
-                                  "state, "
-                                  "owner, "
-                                  "tmpl_id "
-                                  "FROM fcp")
-            fcp_list = result.fetchall()
+            result = conn.execute(
+                text("SELECT fcp_id, assigner_id, connections, reserved, "
+                     "wwpn_npiv, wwpn_phy, chpid, pchid, state, owner, "
+                     "tmpl_id FROM fcp" + where),
+                filter_params)
+            fcp_list = _fetchall(result)
 
         return fcp_list
 
     @staticmethod
     def get_inuse_fcp_device_by_fcp_template(fcp_template_id):
         """ Get the FCP devices allocated from the template """
+        filter_sql, filter_params = _node_filter()
         with get_fcp_conn() as conn:
-            query_sql = conn.execute("SELECT fcp_id FROM fcp "
-                                     "WHERE tmpl_id=?",
-                                     (fcp_template_id,))
-            result = query_sql.fetchall()
-        # result example
-        # [<sqlite3.Row object at 0x3ff8d1d64d0>,
-        #  <sqlite3.Row object at 0x3ff8d1d6570>,
-        #  <sqlite3.Row object at 0x3ff8d1d6590>]
+            query_sql = conn.execute(
+                text("SELECT fcp_id FROM fcp WHERE tmpl_id=:tmpl_id" + filter_sql),
+                {'tmpl_id': fcp_template_id, **filter_params})
+            result = _fetchall(query_sql)
         return result
 
     #########################################################
@@ -696,19 +614,22 @@ class FCPDbOperator(object):
 
             :return NULL
         """
+        path, fcp_id, tmpl_id = record
         with get_fcp_conn() as conn:
-            conn.execute("UPDATE template_fcp_mapping "
-                         "SET path=? "
-                         "WHERE fcp_id=? and tmpl_id=?",
-                         record)
+            conn.execute(
+                text("UPDATE template_fcp_mapping SET path=:path "
+                     "WHERE fcp_id=:fcp_id and tmpl_id=:tmpl_id"),
+                {'path': path, 'fcp_id': fcp_id, 'tmpl_id': tmpl_id})
 
     def get_path_count(self, fcp_template_id):
+        filter_sql, filter_params = _node_filter()
         with get_fcp_conn() as conn:
             # Get distinct path list in DB
             result = conn.execute(
-                "SELECT DISTINCT path FROM template_fcp_mapping "
-                "WHERE tmpl_id=?", (fcp_template_id,))
-            path_list = result.fetchall()
+                text("SELECT DISTINCT path FROM template_fcp_mapping "
+                     "WHERE tmpl_id=:tmpl_id" + filter_sql),
+                {'tmpl_id': fcp_template_id, **filter_params})
+            path_list = _fetchall(result)
 
         return len(path_list)
 
@@ -723,11 +644,14 @@ class FCPDbOperator(object):
 
             :return NULL
         """
+        dicts = [{'tmpl_id': r[0], 'fcp_id': r[1]} for r in records]
+        if not dicts:
+            return
         with get_fcp_conn() as conn:
-            conn.executemany(
-                "DELETE FROM template_fcp_mapping "
-                "WHERE tmpl_id=? AND fcp_id=?",
-                records)
+            conn.execute(
+                text("DELETE FROM template_fcp_mapping "
+                     "WHERE tmpl_id=:tmpl_id AND fcp_id=:fcp_id"),
+                dicts)
 
     @staticmethod
     def bulk_insert_fcp_device_into_fcp_template(records):
@@ -743,30 +667,40 @@ class FCPDbOperator(object):
 
             :return NULL
         """
+        node_id = db_api.get_compute_node_id()
+        dicts = [{'fcp_id': r[1], 'tmpl_id': r[0], 'node_id': node_id, 'path': r[2]}
+                 for r in records]
+        if not dicts:
+            return
         with get_fcp_conn() as conn:
-            conn.executemany(
-                "INSERT INTO template_fcp_mapping "
-                "(tmpl_id, fcp_id, path) VALUES (?, ?, ?)",
-                records)
+            conn.execute(
+                text("INSERT INTO template_fcp_mapping"
+                     " (fcp_id, tmpl_id, compute_node_id, path)"
+                     " VALUES (:fcp_id, :tmpl_id, :node_id, :path)"),
+                dicts)
 
     #########################################################
     #               DML for Table template                  #
     #########################################################
     def fcp_template_exist_in_db(self, fcp_template_id: str):
+        filter_sql, filter_params = _node_filter()
         with get_fcp_conn() as conn:
-            query_sql = conn.execute("SELECT id FROM template "
-                                     "WHERE id=?", (fcp_template_id,))
-            query_ids = query_sql.fetchall()
+            query_sql = conn.execute(
+                text("SELECT id FROM template WHERE id=:id" + filter_sql),
+                {'id': fcp_template_id, **filter_params})
+            query_ids = _fetchall(query_sql)
         if query_ids:
             return True
         else:
             return False
 
     def get_min_fcp_paths_count_from_db(self, fcp_template_id):
+        filter_sql, filter_params = _node_filter()
         with get_fcp_conn() as conn:
-            query_sql = conn.execute("SELECT min_fcp_paths_count FROM template "
-                                     "WHERE id=?", (fcp_template_id,))
-            min_fcp_paths_count = query_sql.fetchone()
+            query_sql = conn.execute(
+                text("SELECT min_fcp_paths_count FROM template WHERE id=:id" + filter_sql),
+                {'id': fcp_template_id, **filter_params})
+            min_fcp_paths_count = _fetchone(query_sql)
             if min_fcp_paths_count:
                 return min_fcp_paths_count['min_fcp_paths_count']
             else:
@@ -789,21 +723,26 @@ class FCPDbOperator(object):
             #    if the is_default of the being-created template is True,
             #    because only one default template per host is allowed
             if host_default is True:
-                conn.execute("UPDATE template SET is_default=?", (False,))
+                conn.execute(text("UPDATE template SET is_default=:val"),
+                             {'val': False})
             # 2. update current template
-            conn.execute("UPDATE template "
-                         "SET name=?, description=?, is_default=?, "
-                         "min_fcp_paths_count=? WHERE id=?",
-                         record)
+            conn.execute(
+                text("UPDATE template SET name=:name, description=:desc, "
+                     "is_default=:is_default, min_fcp_paths_count=:min_count "
+                     "WHERE id=:id"),
+                {'name': name, 'desc': description, 'is_default': host_default,
+                 'min_count': min_fcp_paths_count, 'id': fcp_template_id})
 
     #########################################################
     #          DML for Table template_sp_mapping            #
     #########################################################
     def sp_name_exist_in_db(self, sp_name: str):
         with get_fcp_conn() as conn:
-            query_sp = conn.execute("SELECT sp_name FROM template_sp_mapping "
-                                    "WHERE sp_name=?", (sp_name,))
-            query_sp_names = query_sp.fetchall()
+            query_sp = conn.execute(
+                text("SELECT sp_name FROM template_sp_mapping "
+                     "WHERE sp_name=:sp_name"),
+                {'sp_name': sp_name})
+            query_sp_names = _fetchall(query_sp)
 
         if query_sp_names:
             return True
@@ -834,19 +773,21 @@ class FCPDbOperator(object):
         #  e.insert ['sp3', 'sp4'] with template_id as default
         with get_fcp_conn() as conn:
             # delete all records related to the template_id
-            conn.execute("DELETE FROM template_sp_mapping "
-                         "WHERE tmpl_id=?", (template_id,))
-            # delete all records related to the
-            # storage providers in sp_name_list
-            records = ((sp, ) for sp in sp_name_list)
-            conn.executemany("DELETE FROM template_sp_mapping "
-                             "WHERE sp_name=?", records)
-            # insert new record for each
-            # storage provider in sp_name_list
-            records = ((template_id, sp) for sp in sp_name_list)
-            conn.executemany("INSERT INTO template_sp_mapping "
-                             "(tmpl_id, sp_name) VALUES (?, ?)",
-                             records)
+            conn.execute(
+                text("DELETE FROM template_sp_mapping WHERE tmpl_id=:tmpl_id"),
+                {'tmpl_id': template_id})
+            # delete all records related to the storage providers in sp_name_list
+            conn.execute(
+                text("DELETE FROM template_sp_mapping WHERE sp_name=:sp_name"),
+                [{'sp_name': sp} for sp in sp_name_list])
+            # insert new record for each storage provider in sp_name_list
+            node_id = db_api.get_compute_node_id()
+            conn.execute(
+                text("INSERT INTO template_sp_mapping"
+                     " (sp_name, tmpl_id, compute_node_id)"
+                     " VALUES (:sp_name, :tmpl_id, :node_id)"),
+                [{'sp_name': sp, 'tmpl_id': template_id, 'node_id': node_id}
+                 for sp in sp_name_list])
 
     #########################################################
     #           DML related to multiple tables              #
@@ -865,20 +806,22 @@ class FCPDbOperator(object):
            {'fcp_id':'1C04', 'path':4, 'pchid':'B', 'wwpn_npiv':'bb', 'wwpn_phy':'yy'},
            {'fcp_id':'1E05', 'path':5, 'pchid':'E', 'wwpn_npiv':'cc', 'wwpn_phy':'zz'}]
         """
+        filter_sql, filter_params = _node_filter(prefix='fcp')
         with get_fcp_conn() as conn:
             result = conn.execute(
-                "SELECT "
-                "fcp.fcp_id, fcp.wwpn_npiv, fcp.wwpn_phy, tf.path, fcp.pchid "
-                "FROM template_fcp_mapping AS tf "
-                "INNER JOIN fcp "
-                "ON tf.fcp_id=fcp.fcp_id "
-                "WHERE tf.tmpl_id=? "
-                "AND fcp.assigner_id=? "
-                "AND (fcp.connections<>0 OR fcp.reserved<>0) "
-                "AND fcp.tmpl_id=? "
-                "ORDER BY tf.fcp_id ASC",
-                (fcp_template_id, assigner_id, fcp_template_id))
-            fcp_list = result.fetchall()
+                text("SELECT fcp.fcp_id, fcp.wwpn_npiv, fcp.wwpn_phy, "
+                     "tf.path, fcp.pchid "
+                     "FROM template_fcp_mapping AS tf "
+                     "INNER JOIN fcp ON tf.fcp_id=fcp.fcp_id "
+                     "WHERE tf.tmpl_id=:tmpl_id "
+                     "AND fcp.assigner_id=:assigner_id "
+                     "AND (fcp.connections<>0 OR fcp.reserved<>0) "
+                     "AND fcp.tmpl_id=:tmpl_id2"
+                     + filter_sql +
+                     " ORDER BY tf.fcp_id ASC"),
+                {'tmpl_id': fcp_template_id, 'assigner_id': assigner_id,
+                 'tmpl_id2': fcp_template_id, **filter_params})
+            fcp_list = _fetchall(result)
         return fcp_list
 
     def get_reserved_fcps_from_assigner(self, assigner_id, fcp_template_id):
@@ -894,20 +837,22 @@ class FCPDbOperator(object):
            {'fcp_id':'1C04', 'path':4, 'pchid':'C', 'wwpn_npiv':'bb', 'wwpn_phy':'yy', 'connections':0},
            {'fcp_id':'1E05', 'path':5, 'pchid':'E', 'wwpn_npiv':'cc', 'wwpn_phy':'zz', 'connections':0}]
         """
+        filter_sql, filter_params = _node_filter(prefix='fcp')
         with get_fcp_conn() as conn:
             result = conn.execute(
-                "SELECT fcp.fcp_id, fcp.wwpn_npiv, "
-                "fcp.wwpn_phy, fcp.connections, tf.path, fcp.pchid "
-                "FROM template_fcp_mapping AS tf "
-                "INNER JOIN fcp "
-                "ON tf.fcp_id=fcp.fcp_id "
-                "WHERE tf.tmpl_id=? "
-                "AND fcp.assigner_id=? "
-                "AND fcp.reserved<>0 "
-                "AND fcp.tmpl_id=? "
-                "ORDER BY tf.fcp_id ASC",
-                (fcp_template_id, assigner_id, fcp_template_id))
-            fcp_list = result.fetchall()
+                text("SELECT fcp.fcp_id, fcp.wwpn_npiv, fcp.wwpn_phy, "
+                     "fcp.connections, tf.path, fcp.pchid "
+                     "FROM template_fcp_mapping AS tf "
+                     "INNER JOIN fcp ON tf.fcp_id=fcp.fcp_id "
+                     "WHERE tf.tmpl_id=:tmpl_id "
+                     "AND fcp.assigner_id=:assigner_id "
+                     "AND fcp.reserved<>0 "
+                     "AND fcp.tmpl_id=:tmpl_id2"
+                     + filter_sql +
+                     " ORDER BY tf.fcp_id ASC"),
+                {'tmpl_id': fcp_template_id, 'assigner_id': assigner_id,
+                 'tmpl_id2': fcp_template_id, **filter_params})
+            fcp_list = _fetchall(result)
 
         return fcp_list
 
@@ -953,6 +898,7 @@ class FCPDbOperator(object):
         fcp_list = []
         empty_fcp_list_reason = ''
         fcp_pair_map = {}
+        filter_sql, filter_params = _node_filter(prefix='fcp')
         with get_fcp_conn() as conn:
             # count_per_path examples:
             # in normal cases, all path has same count, eg.
@@ -962,12 +908,14 @@ class FCPDbOperator(object):
             # where path count differs, eg.
             #   4 paths: [7, 4, 5, 6]
             #   2 paths: [7, 6]
-            result = conn.execute("SELECT COUNT(path) "
-                                  "FROM template_fcp_mapping "
-                                  "WHERE tmpl_id=? "
-                                  "GROUP BY path "
-                                  "ORDER BY path ASC", (fcp_template_id,))
-            count_per_path = [a[0] for a in result.fetchall()]
+            result = conn.execute(
+                text("SELECT COUNT(path) AS cnt "
+                     "FROM template_fcp_mapping "
+                     "WHERE tmpl_id=:tmpl_id "
+                     "GROUP BY path "
+                     "ORDER BY path ASC"),
+                {'tmpl_id': fcp_template_id})
+            count_per_path = [a['cnt'] for a in _fetchall(result)]
             # case1: return [] if no fcp found in FCP DB
             if not count_per_path:
                 LOG.error('Because the FCP template ({}) does not include any FCP device, '
@@ -981,19 +929,21 @@ class FCPDbOperator(object):
                     'FCP devices per PCHID.'.format(fcp_template_id))
                 return [], empty_fcp_list_reason
             result = conn.execute(
-                "SELECT COUNT(template_fcp_mapping.path) "
-                "FROM template_fcp_mapping "
-                "INNER JOIN fcp "
-                "ON template_fcp_mapping.fcp_id=fcp.fcp_id "
-                "WHERE template_fcp_mapping.tmpl_id=? "
-                "AND fcp.connections=0 "
-                "AND fcp.reserved=0 "
-                "AND fcp.state='free' "
-                "AND fcp.wwpn_npiv IS NOT '' "
-                "AND fcp.wwpn_phy IS NOT '' "
-                "GROUP BY template_fcp_mapping.path "
-                "ORDER BY template_fcp_mapping.path", (fcp_template_id,))
-            free_count_per_path = [a[0] for a in result.fetchall()]
+                text("SELECT COUNT(template_fcp_mapping.path) AS cnt "
+                     "FROM template_fcp_mapping "
+                     "INNER JOIN fcp "
+                     "ON template_fcp_mapping.fcp_id=fcp.fcp_id "
+                     "WHERE template_fcp_mapping.tmpl_id=:tmpl_id "
+                     "AND fcp.connections=0 "
+                     "AND fcp.reserved=0 "
+                     "AND fcp.state='free' "
+                     "AND fcp.wwpn_npiv <> '' "
+                     "AND fcp.wwpn_phy <> '' "
+                     + filter_sql +
+                     " GROUP BY template_fcp_mapping.path "
+                     "ORDER BY template_fcp_mapping.path"),
+                {'tmpl_id': fcp_template_id, **filter_params})
+            free_count_per_path = [a['cnt'] for a in _fetchall(result)]
             # case2: return [] if no free fcp found from at least one path
             if len(free_count_per_path) < len(count_per_path):
                 # For get_fcp_pair_with_same_index, we will not check the
@@ -1030,14 +980,16 @@ class FCPDbOperator(object):
             #  ('1b04', 0, 0, 'free', ...),
             #  ...]
             result = conn.execute(
-                "SELECT fcp.fcp_id, fcp.connections, tf.path, fcp.pchid, "
-                "fcp.reserved, fcp.state, fcp.wwpn_npiv, fcp.wwpn_phy "
-                "FROM fcp "
-                "INNER JOIN template_fcp_mapping AS tf "
-                "ON tf.fcp_id=fcp.fcp_id "
-                "WHERE tf.tmpl_id=? "
-                "ORDER BY tf.path, tf.fcp_id", (fcp_template_id,))
-            fcps = result.fetchall()
+                text("SELECT fcp.fcp_id, fcp.connections, tf.path, fcp.pchid, "
+                     "fcp.reserved, fcp.state, fcp.wwpn_npiv, fcp.wwpn_phy "
+                     "FROM fcp "
+                     "INNER JOIN template_fcp_mapping AS tf "
+                     "ON tf.fcp_id=fcp.fcp_id "
+                     "WHERE tf.tmpl_id=:tmpl_id"
+                     + filter_sql +
+                     " ORDER BY tf.path, tf.fcp_id"),
+                {'tmpl_id': fcp_template_id, **filter_params})
+            fcps = _fetchall(result)
         # get all free fcps from 1st path
         # fcp_pair_map example:
         #  idx    fcp_pair
@@ -1048,8 +1000,15 @@ class FCPDbOperator(object):
         #
         # The FCP count of 1st path
         for i in range(min(count_per_path)):
-            (fcp_no, connections, path, pchid, reserved,
-             state, wwpn_npiv, wwpn_phy) = fcps[i]
+            row = fcps[i]
+            fcp_no = row['fcp_id']
+            connections = row['connections']
+            path = row['path']
+            pchid = row['pchid']
+            reserved = row['reserved']
+            state = row['state']
+            wwpn_npiv = row['wwpn_npiv']
+            wwpn_phy = row['wwpn_phy']
             if connections == reserved == 0 and state == 'free':
                 fcp_pair_map[i] = [(fcp_no, wwpn_npiv, wwpn_phy, path, pchid)]
         # select out pairs if member count == path count
@@ -1063,8 +1022,15 @@ class FCPDbOperator(object):
             for i, c in enumerate(count_per_path[:-1]):
                 s += c
                 # avoid index out of range for per path in fcps[]
-                (fcp_no, connections, path, pchid, reserved,
-                 state, wwpn_npiv, wwpn_phy) = fcps[s + idx]
+                row = fcps[s + idx]
+                fcp_no = row['fcp_id']
+                connections = row['connections']
+                path = row['path']
+                pchid = row['pchid']
+                reserved = row['reserved']
+                state = row['state']
+                wwpn_npiv = row['wwpn_npiv']
+                wwpn_phy = row['wwpn_phy']
                 if (idx < count_per_path[i + 1] and
                         connections == reserved == 0 and
                         state == 'free'):
@@ -1311,32 +1277,37 @@ class FCPDbOperator(object):
             @return: None
             """
             LOG.info('final_pchid_per_path: {}'.format(final_pchid_per_path))
-            # pchid_path_filter ex:
-            # "(tf.path=1 AND fcp.pchid='BBBB') OR
-            #  (tf.path=4 AND fcp.pchid='CCCC') OR
-            #  (tf.path=5 AND fcp.pchid='EEEE')"
-            pchid_path_filter = ' OR '.join(
-                "(tf.path={} AND fcp.pchid='{}')"
-                "".format(path, final_pchid_per_path[path])
-                for path in final_pchid_per_path)
+            # Build parameterized per-path/pchid filter
+            param_clauses = []
+            params = {'tmpl_id': fcp_template_id}
+            for i, path in enumerate(final_pchid_per_path):
+                p_key = 'p_%d' % i
+                pc_key = 'pchid_%d' % i
+                param_clauses.append(
+                    "(tf.path=:%s AND fcp.pchid=:%s)" % (p_key, pc_key))
+                params[p_key] = path
+                params[pc_key] = final_pchid_per_path[path]
+            pchid_path_filter = ' OR '.join(param_clauses)
+            filter_sql, filter_params = _node_filter(prefix='fcp')
+            params.update(filter_params)
             sql = (
                 "SELECT fcp.fcp_id, fcp.wwpn_npiv, fcp.wwpn_phy, tf.path, fcp.pchid "
                 "FROM template_fcp_mapping as tf "
-                "INNER JOIN fcp "
-                "ON tf.fcp_id=fcp.fcp_id "
-                "WHERE tf.tmpl_id='{}' "
+                "INNER JOIN fcp ON tf.fcp_id=fcp.fcp_id "
+                "WHERE tf.tmpl_id=:tmpl_id "
                 "AND fcp.connections=0 "
                 "AND fcp.reserved=0 "
                 "AND fcp.state='free' "
-                "AND fcp.wwpn_npiv IS NOT '' "
-                "AND fcp.wwpn_phy IS NOT '' "
-                "AND ({}) "
-                "ORDER BY tf.path, fcp.pchid, fcp.fcp_id").format(
-                fcp_template_id, pchid_path_filter)
+                "AND fcp.wwpn_npiv <> '' "
+                "AND fcp.wwpn_phy <> '' "
+                "AND (%s)"
+                "%s "
+                "ORDER BY tf.path, fcp.pchid, fcp.fcp_id") % (pchid_path_filter,
+                                                               filter_sql)
 
             with get_fcp_conn() as conn:
-                query_sql = conn.execute(sql)
-                fcps = query_sql.fetchall()
+                query_sql = conn.execute(text(sql), params)
+                fcps = query_sql.mappings().fetchall()
             # tmp_dict:
             # path as key, list of FCP devices as value. Ex:
             # { 1: [{'fcp_id': '1B02', ...}, {'fcp_id': '1B05', ...}, ...],
@@ -1618,31 +1589,52 @@ class FCPDbOperator(object):
             #    if the is_default of the being-created template is True,
             #    because only one default template per host is allowed
             if host_default is True:
-                conn.execute("UPDATE template SET is_default=?", (False,))
+                conn.execute(text("UPDATE template SET is_default=:val"),
+                             {'val': False})
             # 2. insert a new record in template table
             #    if min_fcp_paths_count is None, -1 will be used as the default
+            node_id = db_api.get_compute_node_id()
             if not min_fcp_paths_count:
-                tmpl_basics = (fcp_template_id, name, description, host_default)
-                sql = ("INSERT INTO template (id, name, description, "
-                       "is_default) VALUES (?, ?, ?, ?)")
+                conn.execute(
+                    text("INSERT INTO template"
+                         " (id, compute_node_id, name, description, is_default)"
+                         " VALUES (:id, :node_id, :name, :desc, :is_default)"),
+                    {'id': fcp_template_id, 'node_id': node_id,
+                     'name': name, 'desc': description,
+                     'is_default': host_default})
             else:
-                tmpl_basics = (fcp_template_id, name, description, host_default, min_fcp_paths_count)
-                sql = ("INSERT INTO template (id, name, description, "
-                       "is_default, min_fcp_paths_count) VALUES (?, ?, ?, ?, ?)")
-            conn.execute(sql, tmpl_basics)
+                conn.execute(
+                    text("INSERT INTO template"
+                         " (id, compute_node_id, name, description,"
+                         "  is_default, min_fcp_paths_count)"
+                         " VALUES (:id, :node_id, :name, :desc,"
+                         "  :is_default, :min_count)"),
+                    {'id': fcp_template_id, 'node_id': node_id,
+                     'name': name, 'desc': description,
+                     'is_default': host_default, 'min_count': min_fcp_paths_count})
             # 3. insert new records in template_fcp_mapping
-            conn.executemany("INSERT INTO template_fcp_mapping (fcp_id, "
-                             "tmpl_id, path) VALUES (?, ?, ?)", fcp_mapping)
+            if fcp_mapping:
+                conn.execute(
+                    text("INSERT INTO template_fcp_mapping"
+                         " (fcp_id, tmpl_id, compute_node_id, path)"
+                         " VALUES (:fcp_id, :tmpl_id, :node_id, :path)"),
+                    [{'fcp_id': r[0], 'tmpl_id': r[1], 'node_id': node_id, 'path': r[2]}
+                     for r in fcp_mapping])
             # 4. insert a new record in template_sp_mapping
             if default_sp_list:
                 if sp_mapping_to_add:
-                    conn.executemany("INSERT INTO template_sp_mapping "
-                                     "(tmpl_id, sp_name) VALUES "
-                                     "(?, ?)", sp_mapping_to_add)
+                    conn.execute(
+                        text("INSERT INTO template_sp_mapping"
+                             " (sp_name, tmpl_id, compute_node_id)"
+                             " VALUES (:sp_name, :tmpl_id, :node_id)"),
+                        [{'sp_name': r[1], 'tmpl_id': r[0], 'node_id': node_id}
+                         for r in sp_mapping_to_add])
                 if sp_mapping_to_update:
-                    conn.executemany("UPDATE template_sp_mapping SET "
-                                     "tmpl_id=? WHERE sp_name=?",
-                                     sp_mapping_to_update)
+                    conn.execute(
+                        text("UPDATE template_sp_mapping SET tmpl_id=:tmpl_id "
+                             "WHERE sp_name=:sp_name"),
+                        [{'tmpl_id': r[0], 'sp_name': r[1]}
+                         for r in sp_mapping_to_update])
 
     def _validate_min_fcp_paths_count(self, fcp_devices, min_fcp_paths_count, fcp_template_id):
         """
@@ -1955,14 +1947,16 @@ class FCPDbOperator(object):
             :return pchids: (list) a list of pchid
             for example: ['0240', '0260']
         """
+        filter_sql, filter_params = _node_filter(prefix='fcp')
+        where = filter_sql.replace(" AND", " WHERE", 1)
         pchids = []
         with get_fcp_conn() as conn:
             result = conn.execute(
-                "SELECT DISTINCT fcp.pchid "
-                "FROM template_fcp_mapping"
-                " AS tf INNER JOIN fcp "
-                "ON tf.fcp_id=fcp.fcp_id")
-            raw = result.fetchall()
+                text("SELECT DISTINCT fcp.pchid "
+                     "FROM template_fcp_mapping AS tf "
+                     "INNER JOIN fcp ON tf.fcp_id=fcp.fcp_id" + where),
+                filter_params)
+            raw = _fetchall(result)
             for item in raw:
                 pchids.append(item['pchid'].upper())
         return pchids
@@ -1978,13 +1972,15 @@ class FCPDbOperator(object):
                 '03FC': '1B02, 1B05'
             }
         """
+        filter_sql, filter_params = _node_filter()
         pchids = dict()
         with get_fcp_conn() as conn:
             result = conn.execute(
-                "SELECT pchid, fcp_id "
-                "FROM fcp "
-                "WHERE tmpl_id != '' "
-                "ORDER BY pchid")
+                text("SELECT pchid, fcp_id FROM fcp "
+                     "WHERE tmpl_id <> ''"
+                     + filter_sql +
+                     " ORDER BY pchid"),
+                filter_params)
             # already ORDER BY pchid in SQL
             # inuse_fcp_devices ex:
             # [ each item is a sqlite3.Row object that can be accessed in dict-style
@@ -1993,7 +1989,7 @@ class FCPDbOperator(object):
             #   {'pchid': '02e0',  'fcp_id': '1a03'},
             #   {'pchid': '03fc',  'fcp_id': '1b02'},
             #   {'pchid': '03fc',  'fcp_id': '1b05'} ]
-            inuse_fcp_devices = result.fetchall()
+            inuse_fcp_devices = _fetchall(result)
 
         # shrink_fcp_list
         if inuse_fcp_devices:
@@ -2020,6 +2016,7 @@ class FCPDbOperator(object):
         return format:
         [(id|name|description|is_default|min_fcp_paths_count|sp_name)]
         """
+        filter_sql, filter_params = _node_filter(prefix='template')
         cmd = ("SELECT template.id, template.name, template.description, "
                "template.is_default, template.min_fcp_paths_count, template_sp_mapping.sp_name "
                "FROM template "
@@ -2028,15 +2025,16 @@ class FCPDbOperator(object):
 
         with get_fcp_conn() as conn:
             if template_id_list:
+                params = {'ids': template_id_list, **filter_params}
                 result = conn.execute(
-                    cmd + " WHERE template.id "
-                    "IN (%s)" %
-                    ','.join('?' * len(template_id_list)),
-                    template_id_list)
+                    text(cmd + " WHERE template.id IN :ids" + filter_sql).bindparams(
+                        bindparam('ids', expanding=True)),
+                    params)
             else:
-                result = conn.execute(cmd)
+                where = filter_sql.replace(" AND", " WHERE", 1)
+                result = conn.execute(text(cmd + where), filter_params)
 
-            raw = result.fetchall()
+            raw = _fetchall(result)
         return raw
 
     def get_pchids_by_fcp_template(self, fcp_template_id):
@@ -2047,16 +2045,17 @@ class FCPDbOperator(object):
         :return pchids: (list) a list of pchid
         for example: ['02E0', '02C0']
         """
+        filter_sql, filter_params = _node_filter(prefix='fcp')
         pchids = []
         with get_fcp_conn() as conn:
             result = conn.execute(
-                    "SELECT DISTINCT fcp.pchid "
-                    "FROM template_fcp_mapping AS tf "
-                    "INNER JOIN fcp "
-                    "ON tf.fcp_id=fcp.fcp_id "
-                    "WHERE tf.tmpl_id=?", (fcp_template_id,))
+                text("SELECT DISTINCT fcp.pchid "
+                     "FROM template_fcp_mapping AS tf "
+                     "INNER JOIN fcp ON tf.fcp_id=fcp.fcp_id "
+                     "WHERE tf.tmpl_id=:tmpl_id" + filter_sql),
+                {'tmpl_id': fcp_template_id, **filter_params})
 
-            raw = result.fetchall()
+            raw = _fetchall(result)
             for item in raw:
                 pchids.append(item['pchid'].upper())
         return pchids
@@ -2071,20 +2070,22 @@ class FCPDbOperator(object):
             {'1': ['01E0', '02A0'],
              '3': ['02A0', '03FC']}
         """
+        filter_sql, filter_params = _node_filter(prefix='fcp')
         pchids = dict()
         with get_fcp_conn() as conn:
             result = conn.execute(
-                "SELECT DISTINCT path, pchid "
-                "FROM template_fcp_mapping AS tf "
-                "INNER JOIN fcp "
-                "ON tf.fcp_id=fcp.fcp_id "
-                "WHERE tf.tmpl_id=? "
-                "AND fcp.connections=0 "
-                "AND fcp.reserved=0 "
-                "AND fcp.state='free' "
-                "AND fcp.wwpn_npiv IS NOT '' "
-                "AND fcp.wwpn_phy IS NOT '' "
-                "ORDER BY path, pchid", (fcp_template_id,))
+                text("SELECT DISTINCT path, pchid "
+                     "FROM template_fcp_mapping AS tf "
+                     "INNER JOIN fcp ON tf.fcp_id=fcp.fcp_id "
+                     "WHERE tf.tmpl_id=:tmpl_id "
+                     "AND fcp.connections=0 "
+                     "AND fcp.reserved=0 "
+                     "AND fcp.state='free' "
+                     "AND fcp.wwpn_npiv <> '' "
+                     "AND fcp.wwpn_phy <> '' "
+                     + filter_sql +
+                     " ORDER BY path, pchid"),
+                {'tmpl_id': fcp_template_id, **filter_params})
 
             # free_pchids_per_path ex:
             # [ each item is a sqlite3.Row object that can be accessed in dict-style
@@ -2092,7 +2093,7 @@ class FCPDbOperator(object):
             #   {'pchid': '02A0',  'path': '1'},
             #   {'pchid': '02A0',  'path': '3'},
             #   {'pchid': '03FC',  'path': '3'} ]
-            free_pchids_per_path = result.fetchall()
+            free_pchids_per_path = _fetchall(result)
             for item in free_pchids_per_path:
                 if item['path'] not in pchids:
                     pchids[item['path']] = []
@@ -2106,29 +2107,23 @@ class FCPDbOperator(object):
         when the  template is more than one SP's default,
         then it will show up several times in the result.
         """
+        filter_sql, filter_params = _node_filter(prefix='t')
         with get_fcp_conn() as conn:
-            if host_default:
-                result = conn.execute(
-                    "SELECT t.id, t.name, t.description, t.is_default, "
-                    "t.min_fcp_paths_count, ts.sp_name "
-                    "FROM template AS t "
-                    "LEFT OUTER JOIN template_sp_mapping AS ts "
-                    "ON t.id=ts.tmpl_id "
-                    "WHERE t.is_default=1")
-            else:
-                result = conn.execute(
-                    "SELECT t.id, t.name, t.description, t.is_default, "
-                    "t.min_fcp_paths_count, ts.sp_name "
-                    "FROM template AS t "
-                    "LEFT OUTER JOIN template_sp_mapping AS ts "
-                    "ON t.id=ts.tmpl_id "
-                    "WHERE t.is_default=0")
-            raw = result.fetchall()
+            result = conn.execute(
+                text("SELECT t.id, t.name, t.description, t.is_default, "
+                     "t.min_fcp_paths_count, ts.sp_name "
+                     "FROM template AS t "
+                     "LEFT OUTER JOIN template_sp_mapping AS ts "
+                     "ON t.id=ts.tmpl_id "
+                     "WHERE t.is_default=:val" + filter_sql),
+                {'val': 1 if host_default else 0, **filter_params})
+            raw = _fetchall(result)
         return raw
 
     def get_sp_default_fcp_template(self, sp_host_list):
         """Get the sp_host_list default FCP Multipath Template.
         """
+        filter_sql, filter_params = _node_filter(prefix='t')
         cmd = ("SELECT t.id, t.name, t.description, t.is_default, "
                "t.min_fcp_paths_count, ts.sp_name "
                "FROM template_sp_mapping AS ts "
@@ -2138,29 +2133,33 @@ class FCPDbOperator(object):
         with get_fcp_conn() as conn:
             if (len(sp_host_list) == 1 and
                     sp_host_list[0].lower() == 'all'):
-                result = conn.execute(cmd)
-                raw = result.fetchall()
+                where = filter_sql.replace(" AND", " WHERE", 1)
+                result = conn.execute(text(cmd + where), filter_params)
+                raw = _fetchall(result)
             else:
                 for sp_host in sp_host_list:
+                    params = {'sp_name': sp_host, **filter_params}
                     result = conn.execute(
-                        cmd + " WHERE ts.sp_name=?", (sp_host,))
-                    raw.extend(result.fetchall())
+                        text(cmd + " WHERE ts.sp_name=:sp_name" + filter_sql),
+                        params)
+                    raw.extend(_fetchall(result))
         return raw
 
     def get_fcp_template_by_assigner_id(self, assigner_id):
         """Get a templates list of specified assigner.
         """
+        filter_sql, filter_params = _node_filter(prefix='fcp')
         with get_fcp_conn() as conn:
             result = conn.execute(
-                "SELECT t.id, t.name, t.description, t.is_default, "
-                "t.min_fcp_paths_count, ts.sp_name "
-                "FROM fcp "
-                "INNER JOIN template AS t "
-                "ON fcp.tmpl_id=t.id "
-                "LEFT OUTER JOIN template_sp_mapping AS ts "
-                "ON fcp.tmpl_id=ts.tmpl_id "
-                "WHERE fcp.assigner_id=?", (assigner_id,))
-            raw = result.fetchall()
+                text("SELECT t.id, t.name, t.description, t.is_default, "
+                     "t.min_fcp_paths_count, ts.sp_name "
+                     "FROM fcp "
+                     "INNER JOIN template AS t ON fcp.tmpl_id=t.id "
+                     "LEFT OUTER JOIN template_sp_mapping AS ts "
+                     "ON fcp.tmpl_id=ts.tmpl_id "
+                     "WHERE fcp.assigner_id=:assigner_id" + filter_sql),
+                {'assigner_id': assigner_id, **filter_params})
+            raw = _fetchall(result)
             # id|name|description|is_default|min_fcp_paths_count|sp_name
         return raw
 
@@ -2200,6 +2199,8 @@ class FCPDbOperator(object):
 
         1aaa|12345678|0|||||||||
         """
+        t_filter_sql, t_filter_params = _node_filter(prefix='t')
+        fcp_filter_sql, fcp_filter_params = _node_filter(prefix='fcp')
         tmpl_cmd = (
             "SELECT t.id, t.name, t.description, "
             "t.is_default, t.min_fcp_paths_count, ts.sp_name "
@@ -2217,37 +2218,39 @@ class FCPDbOperator(object):
 
         with get_fcp_conn() as conn:
             if template_id_list:
+                tmpl_params = {'ids': template_id_list, **t_filter_params}
                 tmpl_result = conn.execute(
-                    tmpl_cmd + " WHERE t.id IN (%s)" %
-                    ','.join('?' * len(template_id_list)),
-                    template_id_list)
-
+                    text(tmpl_cmd + " WHERE t.id IN :ids" + t_filter_sql).bindparams(
+                        bindparam('ids', expanding=True)),
+                    tmpl_params)
+                dev_params = {'ids': template_id_list, **fcp_filter_params}
                 devices_result = conn.execute(
-                    devices_cmd + " WHERE tf.tmpl_id "
-                    "IN (%s)" %
-                    ','.join('?' * len(template_id_list)),
-                    template_id_list)
+                    text(devices_cmd + " WHERE tf.tmpl_id IN :ids" + fcp_filter_sql).bindparams(
+                        bindparam('ids', expanding=True)),
+                    dev_params)
             else:
-                tmpl_result = conn.execute(tmpl_cmd)
-                devices_result = conn.execute(devices_cmd)
+                t_where = t_filter_sql.replace(" AND", " WHERE", 1)
+                tmpl_result = conn.execute(text(tmpl_cmd + t_where), t_filter_params)
+                fcp_where = fcp_filter_sql.replace(" AND", " WHERE", 1)
+                devices_result = conn.execute(text(devices_cmd + fcp_where), fcp_filter_params)
 
-            tmpl_result = tmpl_result.fetchall()
-            devices_result = devices_result.fetchall()
+            tmpl_result = _fetchall(tmpl_result)
+            devices_result = _fetchall(devices_result)
 
         return tmpl_result, devices_result
 
     def bulk_delete_fcp_from_template(self, fcp_id_list, fcp_template_id):
         """Delete multiple FCP records from the table template_fcp_mapping in the
         specified FCP Multipath Template only if the FCP devices are available."""
-        records_to_delete = [(fcp_template_id, fcp_id)
-                             for fcp_id in fcp_id_list]
+        records_to_delete = [{'tmpl_id': fcp_template_id, 'fcp_id': fcp_id}
+                              for fcp_id in fcp_id_list]
         with get_fcp_conn() as conn:
-            conn.executemany(
-                "DELETE FROM template_fcp_mapping "
-                "WHERE fcp_id NOT IN ("
-                "SELECT fcp_id FROM fcp "
-                "WHERE fcp.connections<>0 OR fcp.reserved<>0) "
-                "AND tmpl_id=? AND fcp_id=?",
+            conn.execute(
+                text("DELETE FROM template_fcp_mapping "
+                     "WHERE fcp_id NOT IN ("
+                     "SELECT fcp_id FROM fcp "
+                     "WHERE fcp.connections<>0 OR fcp.reserved<>0) "
+                     "AND tmpl_id=:tmpl_id AND fcp_id=:fcp_id"),
                 records_to_delete)
 
     def delete_fcp_template(self, template_id):
@@ -2270,12 +2273,14 @@ class FCPDbOperator(object):
                           .format(inuse_fcp_devices, template_id))
                 raise exception.SDKConflictError(modID=self._module_id, rs=22,
                                                  msg=detail)
-            conn.execute("DELETE FROM template WHERE id=?",
-                         (template_id,))
-            conn.execute("DELETE FROM template_sp_mapping WHERE tmpl_id=?",
-                         (template_id,))
-            conn.execute("DELETE FROM template_fcp_mapping WHERE tmpl_id=?",
-                         (template_id,))
+            conn.execute(text("DELETE FROM template WHERE id=:id"),
+                         {'id': template_id})
+            conn.execute(
+                text("DELETE FROM template_sp_mapping WHERE tmpl_id=:tmpl_id"),
+                {'tmpl_id': template_id})
+            conn.execute(
+                text("DELETE FROM template_fcp_mapping WHERE tmpl_id=:tmpl_id"),
+                {'tmpl_id': template_id})
             LOG.info("FCP Multipath Template with id %s is removed from "
                      "template, template_sp_mapping and "
                      "template_fcp_mapping tables" % template_id)
@@ -2292,16 +2297,17 @@ class FCPDbOperator(object):
                 '021C': 'c05076de330021c1'
             }
         """
+        filter_sql, filter_params = _node_filter()
         pchid_to_phy_wwpn_dict = {}
         with get_fcp_conn() as conn:
+            params = {'pchids': list(pchids), **filter_params}
             result = conn.execute(
-                    "SELECT DISTINCT pchid, wwpn_phy "
-                    "FROM fcp "
-                    "WHERE pchid IN (%s)" %
-                    ','.join('?' * len(pchids)),
-                    pchids)
+                text("SELECT DISTINCT pchid, wwpn_phy "
+                     "FROM fcp WHERE pchid IN :pchids" + filter_sql).bindparams(
+                    bindparam('pchids', expanding=True)),
+                params)
 
-            raw = result.fetchall()
+            raw = _fetchall(result)
         for item in raw:
             pchid_to_phy_wwpn_dict.update({item['pchid'].upper(): item['wwpn_phy']})
         return pchid_to_phy_wwpn_dict
@@ -2310,99 +2316,79 @@ class FCPDbOperator(object):
 class ImageDbOperator(object):
 
     def __init__(self):
-        self._create_image_table()
         self._module_id = 'image'
-
-    def _create_image_table(self):
-        create_image_table_sql = ' '.join((
-                'CREATE TABLE IF NOT EXISTS image (',
-                'imagename         varchar(128) PRIMARY KEY COLLATE NOCASE,',
-                'imageosdistro            varchar(16),',
-                'md5sum                   varchar(512),',
-                'disk_size_units          varchar(512),',
-                'image_size_in_bytes      varchar(512),',
-                'type                     varchar(16),',
-                'comments                 varchar(128))'))
-        with get_image_conn() as conn:
-            conn.execute(create_image_table_sql)
 
     def image_add_record(self, imagename, imageosdistro, md5sum,
                          disk_size_units, image_size_in_bytes,
                          type, comments=None):
+        # Images are globally shared across nodes ('GLOBAL' sentinel).
+        _params = {'imagename': imagename, 'node_id': 'GLOBAL',
+                   'imageosdistro': imageosdistro, 'md5sum': md5sum,
+                   'disk_size_units': disk_size_units,
+                   'image_size_in_bytes': image_size_in_bytes, 'type': type}
         if comments is not None:
+            _params['comments'] = comments
             with get_image_conn() as conn:
-                conn.execute("INSERT INTO image (imagename, imageosdistro,"
-                             "md5sum, disk_size_units, image_size_in_bytes,"
-                             " type, comments) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                             (imagename, imageosdistro, md5sum,
-                              disk_size_units, image_size_in_bytes, type,
-                              comments))
+                conn.execute(
+                    text("INSERT INTO image"
+                         " (imagename, compute_node_id, imageosdistro,"
+                         "  md5sum, disk_size_units, image_size_in_bytes,"
+                         "  type, comments)"
+                         " VALUES (:imagename, :node_id, :imageosdistro,"
+                         "  :md5sum, :disk_size_units, :image_size_in_bytes,"
+                         "  :type, :comments)"),
+                    _params)
         else:
             with get_image_conn() as conn:
-                conn.execute("INSERT INTO image (imagename, imageosdistro,"
-                             "md5sum, disk_size_units, image_size_in_bytes,"
-                             " type) VALUES (?, ?, ?, ?, ?, ?)",
-                             (imagename, imageosdistro, md5sum,
-                              disk_size_units, image_size_in_bytes, type))
+                conn.execute(
+                    text("INSERT INTO image"
+                         " (imagename, compute_node_id, imageosdistro,"
+                         "  md5sum, disk_size_units, image_size_in_bytes, type)"
+                         " VALUES (:imagename, :node_id, :imageosdistro,"
+                         "  :md5sum, :disk_size_units, :image_size_in_bytes, :type)"),
+                    _params)
 
     def image_query_record(self, imagename=None):
         """Query the image record from database, if imagename is None, all
         of the image records will be returned, otherwise only the specified
         image record will be returned."""
 
+        _cols = ("imagename, imageosdistro, md5sum, disk_size_units,"
+                 " image_size_in_bytes, type, comments")
+        filter_sql, filter_params = _node_filter()
         if imagename:
+            params = {'imagename': imagename, **filter_params}
             with get_image_conn() as conn:
-                result = conn.execute("SELECT * FROM image WHERE "
-                                      "imagename=?", (imagename,))
-                image_list = result.fetchall()
+                result = conn.execute(
+                    text("SELECT %s FROM image WHERE imagename=:imagename" % _cols
+                         + filter_sql),
+                    params)
+                image_list = _fetchall(result)
             if not image_list:
                 obj_desc = "Image with name: %s" % imagename
                 raise exception.SDKObjectNotExistError(obj_desc=obj_desc,
                                                    modID=self._module_id)
         else:
+            where = filter_sql.replace(" AND", " WHERE", 1)
             with get_image_conn() as conn:
-                result = conn.execute("SELECT * FROM image")
-                image_list = result.fetchall()
+                result = conn.execute(
+                    text("SELECT %s FROM image" % _cols + where),
+                    filter_params)
+                image_list = _fetchall(result)
 
-        # Map each image record to be a dict, with the key is the field name in
-        # image DB
-        image_keys_list = ['imagename', 'imageosdistro', 'md5sum',
-                      'disk_size_units', 'image_size_in_bytes', 'type',
-                      'comments']
-
-        image_result = []
-        for item in image_list:
-            image_item = dict(zip(image_keys_list, item))
-            image_result.append(image_item)
-        return image_result
+        return [dict(item._mapping) for item in image_list]
 
     def image_delete_record(self, imagename):
         """Delete the record of specified imagename from image table"""
         with get_image_conn() as conn:
-            conn.execute("DELETE FROM image WHERE imagename=?", (imagename,))
+            conn.execute(text("DELETE FROM image WHERE imagename=:imagename"),
+                         {'imagename': imagename})
 
 
 class GuestDbOperator(object):
 
     def __init__(self):
-        self._create_guests_table()
         self._module_id = 'guest'
-
-    def _create_guests_table(self):
-        """
-        net_set: it is used to describe network interface status, the initial
-                 value is 0, no network interface. It will be updated to be
-                 1 after the network interface is configured
-        """
-        sql = ' '.join((
-            'CREATE TABLE IF NOT EXISTS guests(',
-            'id             char(36)     PRIMARY KEY COLLATE NOCASE,',
-            'userid         varchar(8)   NOT NULL UNIQUE  COLLATE NOCASE,',
-            'metadata       varchar(255),',
-            'net_set        smallint      DEFAULT 0,',
-            'comments       text)'))
-        with get_guest_conn() as conn:
-            conn.execute(sql)
 
     def _check_existence_by_id(self, guest_id, ignore=False):
         guest = self.get_guest_by_id(guest_id)
@@ -2438,8 +2424,12 @@ class GuestDbOperator(object):
         guest_id = str(uuid.uuid4())
         with get_guest_conn() as conn:
             conn.execute(
-                "INSERT INTO guests VALUES (?, ?, ?, ?, ?)",
-                (guest_id, userid, meta, net_set, comments))
+                text("INSERT INTO guests"
+                     " (id, userid, compute_node_id, metadata, net_set, comments)"
+                     " VALUES (:id, :userid, :node_id, :meta, :net_set, :comments)"),
+                {'id': guest_id, 'userid': userid,
+                 'node_id': db_api.get_compute_node_id(),
+                 'meta': meta, 'net_set': net_set, 'comments': comments})
 
     def add_guest(self, userid, meta='', comments=''):
         # Generate uuid automatically
@@ -2447,8 +2437,12 @@ class GuestDbOperator(object):
         net_set = '0'
         with get_guest_conn() as conn:
             conn.execute(
-                "INSERT INTO guests VALUES (?, ?, ?, ?, ?)",
-                (guest_id, userid, meta, net_set, comments))
+                text("INSERT INTO guests"
+                     " (id, userid, compute_node_id, metadata, net_set, comments)"
+                     " VALUES (:id, :userid, :node_id, :meta, :net_set, :comments)"),
+                {'id': guest_id, 'userid': userid,
+                 'node_id': db_api.get_compute_node_id(),
+                 'meta': meta, 'net_set': net_set, 'comments': comments})
 
     def delete_guest_by_id(self, guest_id):
         # First check whether the guest exist in db table
@@ -2458,7 +2452,7 @@ class GuestDbOperator(object):
         # Update guest if exist
         with get_guest_conn() as conn:
             conn.execute(
-                "DELETE FROM guests WHERE id=?", (guest_id,))
+                text("DELETE FROM guests WHERE id=:id"), {'id': guest_id})
 
     def delete_guest_by_userid(self, userid):
         # First check whether the guest exist in db table
@@ -2467,13 +2461,16 @@ class GuestDbOperator(object):
             return
         with get_guest_conn() as conn:
             conn.execute(
-                "DELETE FROM guests WHERE userid=?", (userid,))
+                text("DELETE FROM guests WHERE userid=:userid"),
+                {'userid': userid})
 
     def get_guest_metadata_with_userid(self, userid):
+        filter_sql, filter_params = _node_filter()
         with get_guest_conn() as conn:
-            res = conn.execute("SELECT metadata FROM guests "
-                               "WHERE userid=?", (userid,))
-            guests = res.fetchall()
+            res = conn.execute(
+                text("SELECT metadata FROM guests WHERE userid=:userid" + filter_sql),
+                {'userid': userid, **filter_params})
+            guests = _fetchall(res)
         return guests
 
     def update_guest_by_id(self, uuid, userid=None, meta=None, net_set=None,
@@ -2489,28 +2486,28 @@ class GuestDbOperator(object):
         self._check_existence_by_id(uuid)
         # Start update
         sql_cmd = "UPDATE guests SET"
-        sql_var = []
+        params = {}
         if userid is not None:
-            sql_cmd += " userid=?,"
-            sql_var.append(userid)
+            sql_cmd += " userid=:userid,"
+            params['userid'] = userid
         if meta is not None:
-            sql_cmd += " metadata=?,"
-            sql_var.append(meta)
+            sql_cmd += " metadata=:meta,"
+            params['meta'] = meta
         if net_set is not None:
-            sql_cmd += " net_set=?,"
-            sql_var.append(net_set)
+            sql_cmd += " net_set=:net_set,"
+            params['net_set'] = net_set
         if comments is not None:
-            sql_cmd += " comments=?,"
-            sql_var.append(comments)
+            sql_cmd += " comments=:comments,"
+            params['comments'] = comments
 
         # remove the tailing comma
         sql_cmd = sql_cmd.strip(',')
         # Add the id filter
-        sql_cmd += " WHERE id=?"
-        sql_var.append(uuid)
+        sql_cmd += " WHERE id=:uuid"
+        params['uuid'] = uuid
 
         with get_guest_conn() as conn:
-            conn.execute(sql_cmd, sql_var)
+            conn.execute(text(sql_cmd), params)
 
     def update_guest_by_userid(self, userid, meta=None, net_set=None,
                                comments=None):
@@ -2525,45 +2522,51 @@ class GuestDbOperator(object):
         self._check_existence_by_userid(userid)
         # Start update
         sql_cmd = "UPDATE guests SET"
-        sql_var = []
+        params = {}
         if meta is not None:
-            sql_cmd += " metadata=?,"
-            sql_var.append(meta)
+            sql_cmd += " metadata=:meta,"
+            params['meta'] = meta
         if net_set is not None:
-            sql_cmd += " net_set=?,"
-            sql_var.append(net_set)
+            sql_cmd += " net_set=:net_set,"
+            params['net_set'] = net_set
         if comments is not None:
             new_comments = json.dumps(comments)
-            sql_cmd += " comments=?,"
-            sql_var.append(new_comments)
+            sql_cmd += " comments=:comments,"
+            params['comments'] = new_comments
 
         # remove the tailing comma
         sql_cmd = sql_cmd.strip(',')
-        # Add the id filter
-        sql_cmd += " WHERE userid=?"
-        sql_var.append(userid)
+        # Add the userid filter
+        sql_cmd += " WHERE userid=:userid"
+        params['userid'] = userid
 
         with get_guest_conn() as conn:
-            conn.execute(sql_cmd, sql_var)
+            conn.execute(text(sql_cmd), params)
 
     def get_guest_list(self):
+        filter_sql, filter_params = _node_filter()
+        where = filter_sql.replace(" AND", " WHERE", 1)
         with get_guest_conn() as conn:
-            res = conn.execute("SELECT * FROM guests")
-            guests = res.fetchall()
+            res = conn.execute(text(
+                "SELECT id, userid, metadata, net_set, comments FROM guests" + where),
+                filter_params)
+            guests = _fetchall(res)
         return guests
 
     def get_migrated_guest_list(self):
         with get_guest_conn() as conn:
-            res = conn.execute("SELECT userid FROM guests "
-                               "WHERE comments LIKE '%\"migrated\": 1%'")
-            guests = res.fetchall()
+            res = conn.execute(
+                text("SELECT userid FROM guests "
+                     "WHERE comments LIKE '%\"migrated\": 1%'"))
+            guests = _fetchall(res)
         return guests
 
     def get_migrated_guest_info_list(self):
         with get_guest_conn() as conn:
-            res = conn.execute("SELECT * FROM guests "
-                               "WHERE comments LIKE '%\"migrated\": 1%'")
-            guests = res.fetchall()
+            res = conn.execute(
+                text("SELECT id, userid, metadata, net_set, comments FROM guests "
+                     "WHERE comments LIKE '%\"migrated\": 1%'"))
+            guests = _fetchall(res)
         return guests
 
     def get_comments_by_userid(self, userid):
@@ -2572,13 +2575,13 @@ class GuestDbOperator(object):
         """
         userid = userid
         with get_guest_conn() as conn:
-            res = conn.execute("SELECT comments FROM guests "
-                               "WHERE userid=?", (userid,))
-
-        result = res.fetchall()
+            res = conn.execute(
+                text("SELECT comments FROM guests WHERE userid=:userid"),
+                {'userid': userid})
+            result = _fetchall(res)
         comments = {}
-        if result[0][0]:
-            comments = json.loads(result[0][0])
+        if result[0]['comments']:
+            comments = json.loads(result[0]['comments'])
         return comments
 
     def get_metadata_by_userid(self, userid):
@@ -2587,12 +2590,14 @@ class GuestDbOperator(object):
         """
         userid = userid
         with get_guest_conn() as conn:
-            res = conn.execute("SELECT * FROM guests "
-                               "WHERE userid=?", (userid,))
-            guest = res.fetchall()
+            res = conn.execute(
+                text("SELECT id, userid, metadata, net_set, comments FROM guests"
+                     " WHERE userid=:userid"),
+                {'userid': userid})
+            guest = _fetchall(res)
 
         if len(guest) == 1:
-            return guest[0][2]
+            return guest[0]['metadata']
         elif len(guest) == 0:
             LOG.debug("Guest with userid: %s not found from DB!" % userid)
             return ''
@@ -2616,9 +2621,11 @@ class GuestDbOperator(object):
 
     def get_guest_by_id(self, guest_id):
         with get_guest_conn() as conn:
-            res = conn.execute("SELECT * FROM guests "
-                               "WHERE id=?", (guest_id,))
-            guest = res.fetchall()
+            res = conn.execute(
+                text("SELECT id, userid, metadata, net_set, comments FROM guests"
+                     " WHERE id=:id"),
+                {'id': guest_id})
+            guest = _fetchall(res)
         # As id is the primary key, the filtered entry number should be 0 or 1
         if len(guest) == 1:
             return guest[0]
@@ -2630,10 +2637,13 @@ class GuestDbOperator(object):
 
     def get_guest_by_userid(self, userid):
         userid = userid
+        filter_sql, filter_params = _node_filter()
         with get_guest_conn() as conn:
-            res = conn.execute("SELECT * FROM guests "
-                               "WHERE userid=?", (userid,))
-            guest = res.fetchall()
+            res = conn.execute(
+                text("SELECT id, userid, metadata, net_set, comments FROM guests"
+                     " WHERE userid=:userid" + filter_sql),
+                {'userid': userid, **filter_params})
+            guest = _fetchall(res)
         # As id is the primary key, the filtered entry number should be 0 or 1
         if len(guest) == 1:
             return guest[0]

@@ -81,6 +81,11 @@ class SMTClient(object):
     def __init__(self):
         self._smt = smt.SMT()
         self._pathutils = zvmutils.PathUtils()
+        from zvmsdk.db import migration as db_migration
+        from zvmsdk.db import api as db_api
+        db_migration.ensure_schema_current()
+        db_api.verify_remote_connectivity()
+        db_api.register_compute_node()
         self._NetDbOperator = database.NetworkDbOperator()
         self._GuestDbOperator = database.GuestDbOperator()
         self._ImageDbOperator = database.ImageDbOperator()

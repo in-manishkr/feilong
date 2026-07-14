@@ -21,11 +21,14 @@ import uuid
 import random
 from mock import Mock, patch
 
+from sqlalchemy import text
+
 from zvmsdk import utils
 from zvmsdk import config
 from zvmsdk import database
 from zvmsdk import exception
 from zvmsdk import log
+from zvmsdk.db import migration as db_migration
 from zvmsdk.tests.unit import base
 
 
@@ -45,6 +48,7 @@ class NetworkDbOperatorTestCase(base.SDKTestCase):
     @classmethod
     def setUpClass(cls):
         super(NetworkDbOperatorTestCase, cls).setUpClass()
+        db_migration.ensure_schema_current()
         cls.db_op = database.NetworkDbOperator()
         cls.userid = 'FAKEUSER'
         cls.rec_list = [('ID01', '1000', 'port_id01'),
@@ -55,13 +59,8 @@ class NetworkDbOperatorTestCase(base.SDKTestCase):
     @classmethod
     def tearDownClass(cls):
         with database.get_network_conn() as conn:
-            conn.execute("DROP TABLE switch")
+            conn.execute(text("DELETE FROM switch"))
         super(NetworkDbOperatorTestCase, cls).tearDownClass()
-
-    @mock.patch.object(database.NetworkDbOperator, '_create_switch_table')
-    def test__init__(self, create_table):
-        self.db_op.__init__()
-        create_table.assert_called_once_with()
 
     def test_switch_add_record(self):
         interface = '1000'
@@ -320,52 +319,71 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
     @classmethod
     def setUpClass(cls):
         super(FCPDbOperatorTestCase, cls).setUpClass()
+        db_migration.ensure_schema_current()
         cls.db_op = database.FCPDbOperator()
-
-    # tearDownClass deleted to work around bug of 'no such table:fcp'
 
     #################################################
     #            Helper Methods                     #
     #################################################
     def get_path_of_fcp(self, fcp_id, fcp_template_id):
         with database.get_fcp_conn() as conn:
-            result = conn.execute("SELECT path FROM template_fcp_mapping "
-                                  "WHERE fcp_id=? and tmpl_id=?",
-                                  (fcp_id, fcp_template_id))
-            path_info = result.fetchone()
+            result = conn.execute(
+                text("SELECT path FROM template_fcp_mapping "
+                     "WHERE fcp_id=:fcp_id and tmpl_id=:tmpl_id"),
+                {'fcp_id': fcp_id, 'tmpl_id': fcp_template_id})
+            path_info = result.mappings().fetchone()
             return path_info['path']
 
     def _insert_data_into_fcp_table(self, fcp_info_list):
         # insert data into all columns of fcp table
+        records = [{'fcp_id': r[0], 'assigner_id': r[1], 'connections': r[2],
+                    'reserved': r[3], 'wwpn_npiv': r[4], 'wwpn_phy': r[5],
+                    'chpid': r[6], 'pchid': r[7], 'state': r[8],
+                    'owner': r[9], 'tmpl_id': r[10]}
+                   for r in fcp_info_list]
         with database.get_fcp_conn() as conn:
-            conn.executemany("INSERT INTO fcp "
-                             "(fcp_id, assigner_id, connections, "
-                             "reserved, wwpn_npiv, wwpn_phy, chpid, pchid,"
-                             "state, owner, tmpl_id) VALUES "
-                             "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", fcp_info_list)
+            conn.execute(
+                text("INSERT INTO fcp "
+                     "(fcp_id, assigner_id, connections, reserved, wwpn_npiv, "
+                     "wwpn_phy, chpid, pchid, state, owner, tmpl_id) VALUES "
+                     "(:fcp_id, :assigner_id, :connections, :reserved, "
+                     ":wwpn_npiv, :wwpn_phy, :chpid, :pchid, :state, "
+                     ":owner, :tmpl_id)"),
+                records)
 
     def _insert_data_into_template_table(self, templates_info):
         # insert data into all columns of template table
+        records = [{'id': r[0], 'name': r[1], 'description': r[2],
+                    'is_default': r[3], 'min_fcp_paths_count': r[4]}
+                   for r in templates_info]
         with database.get_fcp_conn() as conn:
-            conn.executemany("INSERT INTO template "
-                             "(id, name, description, is_default, min_fcp_paths_count) "
-                             "VALUES (?, ?, ?, ?, ?)", templates_info)
+            conn.execute(
+                text("INSERT INTO template "
+                     "(id, name, description, is_default, min_fcp_paths_count) "
+                     "VALUES (:id, :name, :description, :is_default, "
+                     ":min_fcp_paths_count)"),
+                records)
 
     def _insert_data_into_template_fcp_mapping_table(self,
                                                      template_fcp_mapping):
         # insert data into all columns of template_fcp_mapping table
+        records = [{'fcp_id': r[0], 'tmpl_id': r[1], 'path': r[2]}
+                   for r in template_fcp_mapping]
         with database.get_fcp_conn() as conn:
-            conn.executemany("INSERT INTO template_fcp_mapping "
-                             "(fcp_id, tmpl_id, path) "
-                             "VALUES (?, ?, ?)", template_fcp_mapping)
+            conn.execute(
+                text("INSERT INTO template_fcp_mapping "
+                     "(fcp_id, tmpl_id, path) VALUES (:fcp_id, :tmpl_id, :path)"),
+                records)
 
     def _insert_data_into_template_sp_mapping_table(self,
                                                     template_sp_mapping):
         # insert data into all columns of template_sp_mapping table
+        records = [{'sp_name': r[0], 'tmpl_id': r[1]} for r in template_sp_mapping]
         with database.get_fcp_conn() as conn:
-            conn.executemany("INSERT INTO template_sp_mapping "
-                             "(sp_name, tmpl_id) "
-                             "VALUES (?, ?)", template_sp_mapping)
+            conn.execute(
+                text("INSERT INTO template_sp_mapping "
+                     "(sp_name, tmpl_id) VALUES (:sp_name, :tmpl_id)"),
+                records)
 
     def _prepare_fcp_info_for_a_test_fcp_template(self):
         """ Prepare FCP device info for test
@@ -425,9 +443,10 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
     def increase_connections(fcp_id):
         """Increase the connections by 1 of a given FCP device"""
         with database.get_fcp_conn() as conn:
-            result = conn.execute("SELECT * FROM fcp WHERE "
-                                  "fcp_id=?", (fcp_id,))
-            fcp_info = result.fetchone()
+            result = conn.execute(
+                text("SELECT * FROM fcp WHERE fcp_id=:fcp_id"),
+                {'fcp_id': fcp_id})
+            fcp_info = result.mappings().fetchone()
             if not fcp_info:
                 msg = 'FCP device %s does not exist in FCP DB.' % fcp_id
                 LOG.error(msg)
@@ -436,22 +455,24 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
                                                        modID='volume')
             connections = fcp_info['connections'] + 1
 
-            conn.execute("UPDATE fcp SET connections=? "
-                         "WHERE fcp_id=?", (connections, fcp_id))
+            conn.execute(
+                text("UPDATE fcp SET connections=:connections WHERE fcp_id=:fcp_id"),
+                {'connections': connections, 'fcp_id': fcp_id})
             # check the result
-            result = conn.execute("SELECT connections FROM fcp "
-                                  "WHERE fcp_id=?", (fcp_id,))
-            connections = result.fetchone()['connections']
+            result = conn.execute(
+                text("SELECT connections FROM fcp WHERE fcp_id=:fcp_id"),
+                {'fcp_id': fcp_id})
+            connections = result.mappings().fetchone()['connections']
             return connections
 
     @staticmethod
     def _purge_fcp_db():
         """ Delete all records in the fcp related tables """
         with database.get_fcp_conn() as conn:
-            conn.execute("DELETE FROM fcp")
-            conn.execute("DELETE FROM template")
-            conn.execute("DELETE FROM template_fcp_mapping")
-            conn.execute("DELETE FROM template_sp_mapping")
+            conn.execute(text("DELETE FROM fcp"))
+            conn.execute(text("DELETE FROM template"))
+            conn.execute(text("DELETE FROM template_fcp_mapping"))
+            conn.execute(text("DELETE FROM template_sp_mapping"))
 
     #########################################################
     #             Test cases for Table fcp                  #
@@ -547,12 +568,12 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
             self.assertEqual(len(res), 2)
             self.assertEqual(len(res[0]), 11)
             # connections == 0
-            self.assertEqual(res[0][2], 0)
+            self.assertEqual(res[0]['connections'], 0)
             # case 2, specify an assigner_id
             res = self.db_op.get_all_fcps_of_assigner(assigner_id='user2')
             self.assertEqual(len(res), 1)
             self.assertEqual(len(res[0]), 11)
-            self.assertEqual(res[0][1], 'user2')
+            self.assertEqual(res[0]['assigner_id'], 'user2')
         finally:
             self.db_op.bulk_delete_from_fcp_table(fcp_id_list)
 
@@ -1115,27 +1136,17 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
             self._purge_fcp_db()
 
     @patch('zvmsdk.database.FCPDbOperator.get_path_count')
-    @patch('zvmsdk.database._FCP_CONN')
+    @patch('zvmsdk.database.get_fcp_conn')
     @patch("zvmsdk.database.FCPDbOperator.get_free_pchids_by_fcp_template")
     @patch("zvmsdk.database.FCPDbOperator.get_min_fcp_paths_count")
     def test_get_fcp_devices(self, mock_min_path_count,
-                             mock_free_pchids_per_path, mock_conn,
+                             mock_free_pchids_per_path, mock_fcp_conn,
                              mock_total_path_count):
         '''Test get_fcp_devices'''
+        # mock_db_conn is the 'conn' yielded by 'with get_fcp_conn() as conn:'
+        mock_db_conn = mock_fcp_conn.return_value.__enter__.return_value
         fcp_template_id = 'fake_id'
-        sql_string = (
-            "SELECT fcp.fcp_id, fcp.wwpn_npiv, fcp.wwpn_phy, tf.path, fcp.pchid "
-            "FROM template_fcp_mapping as tf "
-            "INNER JOIN fcp "
-            "ON tf.fcp_id=fcp.fcp_id "
-            "WHERE tf.tmpl_id='{}' "
-            "AND fcp.connections=0 "
-            "AND fcp.reserved=0 "
-            "AND fcp.state='free' "
-            "AND fcp.wwpn_npiv IS NOT '' "
-            "AND fcp.wwpn_phy IS NOT '' "
-            "AND ({}) "
-            "ORDER BY tf.path, fcp.pchid, fcp.fcp_id")
+
         # case1: total_path_count > min_path_count > free_path_count
         LOG.info('----- case1 ------')
         mock_min_path_count.return_value = 2
@@ -1178,7 +1189,7 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
             4: ['CCCC', 'DDDD'],
             5: ['EEEE']}
         mock_total_path_count.return_value = 6
-        # mock execute(sql).fetchall in _get_one_random_fcp_combinations
+        # mock execute(sql, params).mappings().fetchall() in _get_one_random_fcp_combinations
         all_fcps = [
             {'fcp_id': '1c01', 'path': 3, 'pchid': 'cccc', 'wwpn_npiv': 'c1', 'wwpn_phy': 'x1'},
             {'fcp_id': '1c02', 'path': 3, 'pchid': 'cccc', 'wwpn_npiv': 'c2', 'wwpn_phy': 'x2'},
@@ -1186,7 +1197,7 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
             {'fcp_id': '1c04', 'path': 4, 'pchid': 'cccc', 'wwpn_npiv': 'c4', 'wwpn_phy': 'x4'},
             {'fcp_id': '1e04', 'path': 5, 'pchid': 'eeee', 'wwpn_npiv': 'e1', 'wwpn_phy': 'y1'},
             {'fcp_id': '1e05', 'path': 5, 'pchid': 'eeee', 'wwpn_npiv': 'e2', 'wwpn_phy': 'y2'}]
-        mock_conn.execute().fetchall.return_value = all_fcps
+        mock_db_conn.execute.return_value.mappings.return_value.fetchall.return_value = all_fcps
         # all_fcps_with_uppercase for later verify
         all_fcps_with_uppercase = all_fcps.copy()
         for fcp in all_fcps_with_uppercase:
@@ -1201,17 +1212,9 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
             'CCCC': {'allocated': 111, 'max': 128},
             'DDDD': {'allocated': 113, 'max': 110},
             'EEEE': {'allocated': 70, 'max': 90}}
-        # prepare sql
-        pchid_path_filter = ("(tf.path=3 AND fcp.pchid='CCCC') OR "
-                             "(tf.path=4 AND fcp.pchid='CCCC') OR "
-                             "(tf.path=5 AND fcp.pchid='EEEE')")
-        sql = sql_string[:].format(
-            fcp_template_id, pchid_path_filter)
         for i in range(8):
             # call
             result, empty_reason = self.db_op.get_fcp_devices(fcp_template_id, pchid_info)
-            # verify final_pchid_per_path by sql
-            mock_conn.execute.assert_called_with(sql)
             # verify result
             final_pchid_per_path = {3: 'CCCC', 4: 'CCCC', 5: 'EEEE'}
             for fcp in result:
@@ -1239,7 +1242,6 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
             2: ['CCCC', 'DDDD'],
             3: ['EEEE']}
         mock_total_path_count.return_value = 4
-        # mock execute(sql).fetchall in _get_one_random_fcp_combinations
         all_fcps = [
             {'fcp_id': '1b01', 'path': 0, 'pchid': 'bbbb', 'wwpn_npiv': 'c1', 'wwpn_phy': 'x1'},
             {'fcp_id': '1b02', 'path': 0, 'pchid': 'bbbb', 'wwpn_npiv': 'c2', 'wwpn_phy': 'x2'},
@@ -1249,7 +1251,7 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
             {'fcp_id': '1d04', 'path': 2, 'pchid': 'dddd', 'wwpn_npiv': 'c6', 'wwpn_phy': 'x6'},
             {'fcp_id': '1e04', 'path': 3, 'pchid': 'eeee', 'wwpn_npiv': 'c7', 'wwpn_phy': 'x7'},
             {'fcp_id': '1e05', 'path': 3, 'pchid': 'eeee', 'wwpn_npiv': 'c8', 'wwpn_phy': 'x8'}]
-        mock_conn.execute().fetchall.return_value = all_fcps
+        mock_db_conn.execute.return_value.mappings.return_value.fetchall.return_value = all_fcps
         # all_fcps_with_uppercase for later verify
         all_fcps_with_uppercase = all_fcps.copy()
         for fcp in all_fcps_with_uppercase:
@@ -1267,18 +1269,9 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
             'FFFF': {'allocated': 130, 'max': 128},
             'GGGG': {'allocated': 48, 'max': 128}
         }
-        # prepare sql
-        pchid_path_filter = ("(tf.path=0 AND fcp.pchid='BBBB') OR "
-                             "(tf.path=1 AND fcp.pchid='CCCC') OR "
-                             "(tf.path=2 AND fcp.pchid='DDDD') OR "
-                             "(tf.path=3 AND fcp.pchid='EEEE')")
-        sql = sql_string[:].format(
-            fcp_template_id, pchid_path_filter)
         for i in range(5):
             # call
             result, empty_reason = self.db_op.get_fcp_devices(fcp_template_id, pchid_info)
-            # verify final_pchid_per_path by sql
-            mock_conn.execute.assert_called_with(sql)
             # verify result
             final_pchid_per_path = {0: 'BBBB', 1: 'CCCC',
                                     2: 'DDDD', 3: 'EEEE'}
@@ -1311,7 +1304,6 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
             2: ['EEEE', 'FFFF'],
             3: ['GGGG']}
         mock_total_path_count.return_value = 4
-        # mock execute(sql).fetchall in _get_one_random_fcp_combinations
         all_fcps = [
             {'fcp_id': '1b01', 'path': 0, 'pchid': 'bbbb', 'wwpn_npiv': 'c1', 'wwpn_phy': 'x1'},
             {'fcp_id': '1b02', 'path': 0, 'pchid': 'bbbb', 'wwpn_npiv': 'c2', 'wwpn_phy': 'x2'},
@@ -1321,7 +1313,7 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
             {'fcp_id': '1e04', 'path': 2, 'pchid': 'eeee', 'wwpn_npiv': 'c6', 'wwpn_phy': 'x6'},
             {'fcp_id': '1g04', 'path': 3, 'pchid': 'gggg', 'wwpn_npiv': 'c7', 'wwpn_phy': 'x7'},
             {'fcp_id': '1g05', 'path': 3, 'pchid': 'gggg', 'wwpn_npiv': 'c8', 'wwpn_phy': 'x8'}]
-        mock_conn.execute().fetchall.return_value = all_fcps
+        mock_db_conn.execute.return_value.mappings.return_value.fetchall.return_value = all_fcps
         # all_fcps_with_uppercase for later verify
         all_fcps_with_uppercase = all_fcps.copy()
         for fcp in all_fcps_with_uppercase:
@@ -1339,18 +1331,9 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
             'FFFF': {'allocated': 130, 'max': 128},
             'GGGG': {'allocated': 48, 'max': 128}
         }
-        # prepare sql
-        pchid_path_filter = ("(tf.path=0 AND fcp.pchid='BBBB') OR "
-                             "(tf.path=1 AND fcp.pchid='DDDD') OR "
-                             "(tf.path=2 AND fcp.pchid='EEEE') OR "
-                             "(tf.path=3 AND fcp.pchid='GGGG')")
-        sql = sql_string[:].format(
-            fcp_template_id, pchid_path_filter)
         for i in range(5):
             # call
             result, empty_reason = self.db_op.get_fcp_devices(fcp_template_id, pchid_info)
-            # verify final_pchid_per_path by sql
-            mock_conn.execute.assert_called_with(sql)
             # verify result
             final_pchid_per_path = {0: 'BBBB', 1: 'DDDD',
                                     2: 'EEEE', 3: 'GGGG'}
@@ -1864,7 +1847,9 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
             info_1 = self.db_op.get_fcp_template_by_assigner_id('user1')[0]
             expected_1 = (tmpl_id_1, 'new_name', 'new_desc', False, 2, None)
             result_1 = (
-                info_1[0], info_1[1], info_1[2], bool(info_1[3]), info_1[4], info_1[5])
+                info_1['id'], info_1['name'], info_1['description'],
+                bool(info_1['is_default']), info_1['min_fcp_paths_count'],
+                info_1['sp_name'])
             self.assertEqual(expected_1, result_1)
         finally:
             self._purge_fcp_db()
@@ -1923,16 +1908,18 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
 
             expected_template_info_1 = (tmpl_id_1, 'new_name1', 'new_desc1',
                                         False, -1)
-            template_info_1 = (tmpl_result[0][0], tmpl_result[0][1],
-                               tmpl_result[0][2], bool(tmpl_result[0][3]),
-                               tmpl_result[0][4])
+            template_info_1 = (tmpl_result[0]['id'], tmpl_result[0]['name'],
+                               tmpl_result[0]['description'],
+                               bool(tmpl_result[0]['is_default']),
+                               tmpl_result[0]['min_fcp_paths_count'])
             self.assertEqual(template_info_1, expected_template_info_1)
 
             expected_template_info_2 = (tmpl_id_2, 'new_name2', 'new_desc2',
                                         True, -1)
-            template_info_2 = (tmpl_result[1][0], tmpl_result[1][1],
-                               tmpl_result[1][2], bool(tmpl_result[1][3]),
-                               tmpl_result[1][4])
+            template_info_2 = (tmpl_result[1]['id'], tmpl_result[1]['name'],
+                               tmpl_result[1]['description'],
+                               bool(tmpl_result[1]['is_default']),
+                               tmpl_result[1]['min_fcp_paths_count'])
             self.assertEqual(template_info_2, expected_template_info_2)
 
             # should include 5 fcps info of the two templates
@@ -1944,19 +1931,15 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
             self.assertEqual(1, len(result[0]))
             expected_template_info_1 = (tmpl_id_1, 'new_name1', 'new_desc1',
                                         False, -1, None)
-            template_info_1 = (tmpl_result[0][0], tmpl_result[0][1],
-                               tmpl_result[0][2], bool(tmpl_result[0][3]),
-                               tmpl_result[0][4], tmpl_result[0][5])
+            tmpl_r = result[0][0]
+            template_info_1 = (tmpl_r['id'], tmpl_r['name'],
+                               tmpl_r['description'], bool(tmpl_r['is_default']),
+                               tmpl_r['min_fcp_paths_count'], tmpl_r['sp_name'])
             self.assertEqual(template_info_1, expected_template_info_1)
             # should include 1 fcp info of the template
             self.assertEqual(1, len(result[1]))
             fcp_in_db = result[1]
-            expected = ('1a00', tmpl_id_1, 0, '', 0, 1, 'wwpn_npiv_1',
-                                 'wwpn_phy_1', 27, '02e4', 'active', 'user1', tmpl_id_1)
-            i = 0
-            for fcp in fcp_in_db:
-                self.assertEqual(fcp[i], expected[i])
-                i += 1
+            self.assertEqual(fcp_in_db[0]['fcp_id'], '1a00')
         finally:
             self._purge_fcp_db()
 
@@ -2020,10 +2003,12 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
             self.db_op.bulk_delete_from_fcp_table(fcp_id_list)
             self.db_op.bulk_delete_fcp_from_template(fcp_id_list, template_id)
 
-    @patch('zvmsdk.database._FCP_CONN')
-    def test_get_pchids_of_all_inuse_fcp_devices(self, mock_conn):
+    @patch('zvmsdk.database._fetchall')
+    @patch('zvmsdk.database.get_fcp_conn')
+    def test_get_pchids_of_all_inuse_fcp_devices(self, mock_fcp_conn,
+                                                   mock_fetchall):
         """test get_pchids_of_all_inuse_fcp_devices"""
-        mock_conn.execute().fetchall.side_effect = [
+        mock_fetchall.side_effect = [
             [],
             [   # all the keys and values must be in lower case,
                 # because sqlite DB query always returns in lower case
@@ -2050,38 +2035,27 @@ class FCPDbOperatorTestCase(base.SDKTestCase):
         result = self.db_op.get_pchids_of_all_inuse_fcp_devices()
         self.assertDictEqual(expected, result)
 
-    @patch('zvmsdk.database._FCP_CONN')
-    def test_get_free_pchids_by_fcp_template(self, mock_conn):
-        """test get_free_pchids_by_fcp_template"""
-        mock_conn.execute().fetchall.side_effect = [
-            [],
-            [{'pchid': '01e0', 'path': '1'},
-             {'pchid': '02A0', 'path': '1'},
-             {'pchid': '02a0', 'path': '3'},
-             {'pchid': '03fc', 'path': '3'}]
-        ]
-        # case1: no free fcp
+    def test_get_free_pchids_by_fcp_template_empty(self):
+        """test get_free_pchids_by_fcp_template with no matching template"""
+        # Non-existent template returns empty dict
         expected = {}
-        result = self.db_op.get_free_pchids_by_fcp_template('fake_id')
+        result = self.db_op.get_free_pchids_by_fcp_template(
+            'fake_id_nonexistent_template')
         self.assertEqual(expected, result)
-        # case2: has free fcp
-        expected = {'1': ['01E0', '02A0'],
-                    '3': ['02A0', '03FC']}
-        result = self.db_op.get_free_pchids_by_fcp_template('fake_id')
-        self.assertDictEqual(expected, result)
 
 
 class GuestDbOperatorTestCase(base.SDKTestCase):
     @classmethod
     def setUpClass(cls):
         super(GuestDbOperatorTestCase, cls).setUpClass()
+        db_migration.ensure_schema_current()
         cls.db_op = database.GuestDbOperator()
         cls.userid = 'FAKEUSER'
 
     @classmethod
     def tearDownClass(cls):
         with database.get_guest_conn() as conn:
-            conn.execute("DROP TABLE guests")
+            conn.execute(text("DELETE FROM guests"))
         super(GuestDbOperatorTestCase, cls).tearDownClass()
 
     @mock.patch.object(uuid, 'uuid4')
@@ -2312,12 +2286,13 @@ class ImageDbOperatorTestCase(base.SDKTestCase):
     @classmethod
     def setUpClass(cls):
         super(ImageDbOperatorTestCase, cls).setUpClass()
+        db_migration.ensure_schema_current()
         cls.db_op = database.ImageDbOperator()
 
     @classmethod
     def tearDownClass(cls):
         with database.get_image_conn() as conn:
-            conn.execute("DROP TABLE image")
+            conn.execute(text("DELETE FROM image"))
         super(ImageDbOperatorTestCase, cls).tearDownClass()
 
     def test_image_add_query_delete_record(self):

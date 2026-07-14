@@ -1,0 +1,769 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1100" viewBox="0 0 1800 1100">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#546E7A"/>
+    </marker>
+    <marker id="arr-b" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#1565C0"/>
+    </marker>
+    <marker id="arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#388E3C"/>
+    </marker>
+    <marker id="arr-p" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#7B1FA2"/>
+    </marker>
+    <marker id="arr-o" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#E65100"/>
+    </marker>
+  </defs>
+
+  <!-- ===================== BACKGROUND ===================== -->
+  <rect width="1800" height="1100" fill="#ECEFF1"/>
+
+  <!-- ===================== TITLE BAR ===================== -->
+  <rect x="0" y="0" width="1800" height="66" fill="#0D47A1"/>
+  <text x="900" y="26" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">
+    Feilong (z/VM Cloud Connector) — Bring Your Own Database (BYODB)
+  </text>
+  <text x="900" y="50" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="13" fill="#BBDEFB">
+    High Level Design  |  9 Phases Complete  |  202 Tests Pass  |  Branch: byodb
+  </text>
+
+  <!-- ===================== COLUMN DIVIDERS ===================== -->
+  <line x1="452" y1="74" x2="452" y2="792" stroke="#90A4AE" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="1058" y1="74" x2="1058" y2="792" stroke="#90A4AE" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="0" y1="792" x2="1800" y2="792" stroke="#90A4AE" stroke-width="1" stroke-dasharray="4,3"/>
+
+
+  <!-- ╔══════════════════════════════════════════════════════════╗ -->
+  <!-- ║   LEFT COLUMN — DEPLOYMENT TOPOLOGIES  (x=12 .. 440)   ║ -->
+  <!-- ╚══════════════════════════════════════════════════════════╝ -->
+
+  <!-- Column header -->
+  <rect x="12" y="74" width="430" height="30" rx="4" fill="#263238"/>
+  <text x="227" y="94" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="12" font-weight="700" fill="#ECEFF1">
+    DEPLOYMENT TOPOLOGIES
+  </text>
+
+  <!-- ─── LOCAL MODE card ─── -->
+  <rect x="12" y="112" width="430" height="210" rx="6" fill="#FFFFFF" stroke="#388E3C" stroke-width="2"/>
+  <rect x="12" y="112" width="430" height="28" rx="6" fill="#388E3C"/>
+  <rect x="12" y="128" width="430" height="12" fill="#388E3C"/>
+  <text x="227" y="131" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">
+    LOCAL MODE  (default — backward compatible)
+  </text>
+
+  <!-- Node A → SQLite -->
+  <rect x="26" y="150" width="148" height="52" rx="4" fill="#E8F5E9" stroke="#388E3C" stroke-width="1.5"/>
+  <text x="100" y="167" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#1B5E20">Compute Node A</text>
+  <text x="100" y="181" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#2E7D32">feilong daemon</text>
+  <text x="100" y="195" text-anchor="middle"
+        font-family="Consolas,'Courier New',monospace" font-size="8" fill="#388E3C">backend=sqlite</text>
+
+  <line x1="174" y1="176" x2="196" y2="176" stroke="#388E3C" stroke-width="1.5" marker-end="url(#arr-g)"/>
+
+  <rect x="200" y="150" width="108" height="52" rx="4" fill="#F1F8E9" stroke="#558B2F" stroke-width="1.5"/>
+  <text x="254" y="167" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#33691E">SQLite</text>
+  <text x="254" y="181" text-anchor="middle"
+        font-family="Consolas,'Courier New',monospace" font-size="8" fill="#558B2F">zvmsdk.db</text>
+  <text x="254" y="194" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#558B2F">StaticPool</text>
+
+  <!-- Node B → MariaDB local -->
+  <rect x="26" y="212" width="148" height="52" rx="4" fill="#E8F5E9" stroke="#388E3C" stroke-width="1.5"/>
+  <text x="100" y="229" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#1B5E20">Compute Node B</text>
+  <text x="100" y="243" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#2E7D32">feilong daemon</text>
+  <text x="100" y="257" text-anchor="middle"
+        font-family="Consolas,'Courier New',monospace" font-size="8" fill="#388E3C">backend=mariadb</text>
+
+  <line x1="174" y1="238" x2="196" y2="238" stroke="#388E3C" stroke-width="1.5" marker-end="url(#arr-g)"/>
+
+  <rect x="200" y="212" width="108" height="52" rx="4" fill="#F1F8E9" stroke="#558B2F" stroke-width="1.5"/>
+  <text x="254" y="229" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#33691E">MariaDB</text>
+  <text x="254" y="243" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#558B2F">localhost:3306</text>
+  <text x="254" y="256" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#558B2F">QueuePool</text>
+
+  <text x="22" y="284" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">&#x2713; Each node has its own independent database</text>
+  <text x="22" y="298" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">&#x2713; compute_node_id stored in rows but NOT used for query filtering</text>
+  <text x="22" y="312" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">&#x2713; Zero config change required for existing deployments</text>
+
+  <!-- ─── REMOTE MODE card ─── -->
+  <rect x="12" y="332" width="430" height="448" rx="6" fill="#FFFFFF" stroke="#7B1FA2" stroke-width="2"/>
+  <rect x="12" y="332" width="430" height="28" rx="6" fill="#7B1FA2"/>
+  <rect x="12" y="348" width="430" height="12" fill="#7B1FA2"/>
+  <text x="227" y="351" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">
+    REMOTE MODE  (multi-node OpenStack deployment)
+  </text>
+
+  <!-- Central MariaDB -->
+  <rect x="80" y="370" width="280" height="76" rx="6" fill="#EDE7F6" stroke="#7B1FA2" stroke-width="2"/>
+  <text x="220" y="390" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="11" font-weight="700" fill="#4A148C">Centralized MariaDB / MySQL</text>
+  <text x="220" y="406" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#6A1B9A">Management Node — TCP 3306</text>
+  <text x="220" y="420" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#6A1B9A">HA: Galera Cluster  |  ProxySQL</text>
+  <text x="220" y="434" text-anchor="middle"
+        font-family="Consolas,'Courier New',monospace" font-size="8" fill="#7B1FA2">database=zvmsdk  charset=utf8mb4  InnoDB</text>
+
+  <!-- TLS dashed lines to compute nodes -->
+  <line x1="130" y1="446" x2="76"  y2="528" stroke="#7B1FA2" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-p)"/>
+  <line x1="220" y1="446" x2="220" y2="528" stroke="#7B1FA2" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-p)"/>
+  <line x1="310" y1="446" x2="362" y2="528" stroke="#7B1FA2" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-p)"/>
+  <text x="118" y="495" font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#7B1FA2" font-style="italic">TLS/SSL</text>
+
+  <!-- Three compute nodes -->
+  <rect x="22"  y="532" width="108" height="66" rx="4" fill="#F3E5F5" stroke="#9C27B0" stroke-width="1.5"/>
+  <text x="76"  y="550" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#4A148C">Compute A</text>
+  <text x="76"  y="564" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="9"  fill="#6A1B9A">feilong</text>
+  <text x="76"  y="578" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#7B1FA2">node_id=A</text>
+  <text x="76"  y="591" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="8"  fill="#9C27B0">mode=remote</text>
+
+  <rect x="162" y="532" width="116" height="66" rx="4" fill="#F3E5F5" stroke="#9C27B0" stroke-width="1.5"/>
+  <text x="220" y="550" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#4A148C">Compute B</text>
+  <text x="220" y="564" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="9"  fill="#6A1B9A">feilong</text>
+  <text x="220" y="578" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#7B1FA2">node_id=B</text>
+  <text x="220" y="591" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="8"  fill="#9C27B0">mode=remote</text>
+
+  <rect x="308" y="532" width="112" height="66" rx="4" fill="#F3E5F5" stroke="#9C27B0" stroke-width="1.5"/>
+  <text x="364" y="550" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#4A148C">Compute C</text>
+  <text x="364" y="564" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="9"  fill="#6A1B9A">feilong</text>
+  <text x="364" y="578" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#7B1FA2">node_id=C</text>
+  <text x="364" y="591" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="8"  fill="#9C27B0">mode=remote</text>
+
+  <text x="22" y="617" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">&#x2713; All nodes share one centralized database</text>
+  <text x="22" y="631" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">&#x2713; Rows scoped by compute_node_id — each node reads only its own rows</text>
+  <text x="22" y="645" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">&#x2713; FK constraints enforced ON DELETE CASCADE (remote mode only)</text>
+  <text x="22" y="659" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">&#x2713; Stale node detection via last_seen timeout — auto-marks inactive</text>
+  <text x="22" y="673" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">&#x2713; UPSERT on startup — register_compute_node() is idempotent</text>
+  <text x="22" y="687" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">&#x2713; image table uses sentinel compute_node_id='GLOBAL' (shared images)</text>
+  <text x="22" y="701" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">&#x2713; Concurrent Alembic migrations serialised via _MIGRATION_LOCK</text>
+
+  <!-- Upgrade path banner -->
+  <rect x="22" y="720" width="410" height="22" rx="4" fill="#FFF9C4" stroke="#F57F17" stroke-width="1"/>
+  <text x="227" y="735" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#E65100">
+    Upgrade path: tools/migrate_sqlite_to_mariadb.py  (idempotent — safe to re-run)
+  </text>
+
+  <text x="22" y="758" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">
+    Firewall: allow TCP 3306 from compute node IPs only
+  </text>
+  <text x="22" y="772" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">
+    rollback: set backend=sqlite in zvmsdk.conf and restart — no data loss
+  </text>
+
+
+  <!-- ╔═══════════════════════════════════════════════════════════════╗ -->
+  <!-- ║   CENTER COLUMN — SOFTWARE ARCHITECTURE  (x=466 .. 1046)    ║ -->
+  <!-- ╚═══════════════════════════════════════════════════════════════╝ -->
+
+  <!-- Column header -->
+  <rect x="466" y="74" width="580" height="30" rx="4" fill="#263238"/>
+  <text x="756" y="94" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="12" font-weight="700" fill="#ECEFF1">
+    SOFTWARE ARCHITECTURE STACK
+  </text>
+
+  <!-- Layer 1: REST API -->
+  <rect x="466" y="112" width="580" height="64" rx="6" fill="#E3F2FD" stroke="#1565C0" stroke-width="2"/>
+  <text x="756" y="132" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="11" font-weight="700" fill="#0D47A1">REST API Layer</text>
+  <text x="756" y="148" text-anchor="middle"
+        font-family="Consolas,'Courier New',monospace" font-size="9" fill="#1565C0">
+    smtclient.py  — ensure_schema_current()  then  register_compute_node()
+  </text>
+  <text x="756" y="164" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#1976D2">
+    OpenStack nova.virt.zvm driver calls feilong REST API (transparent — no driver changes)
+  </text>
+
+  <!-- arrow -->
+  <line x1="756" y1="176" x2="756" y2="196" stroke="#546E7A" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Layer 2: DB Operators -->
+  <rect x="466" y="198" width="580" height="96" rx="6" fill="#FFF8E1" stroke="#F57F17" stroke-width="2"/>
+  <text x="756" y="217" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="11" font-weight="700" fill="#E65100">
+    DB Operator Layer  (zvmsdk/database.py)
+  </text>
+
+  <rect x="476" y="226" width="130" height="58" rx="4" fill="#FFFDE7" stroke="#F9A825" stroke-width="1.5"/>
+  <text x="541" y="243" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="9" font-weight="700" fill="#E65100">NetworkDbOperator</text>
+  <text x="541" y="257" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#F57F17">switch table</text>
+  <text x="541" y="270" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#F57F17">get_switch_conn()</text>
+  <text x="541" y="280" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="7.5" fill="#9E9E9E">node-filtered in remote</text>
+
+  <rect x="614" y="226" width="130" height="58" rx="4" fill="#FFFDE7" stroke="#F9A825" stroke-width="1.5"/>
+  <text x="679" y="243" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="9" font-weight="700" fill="#E65100">GuestDbOperator</text>
+  <text x="679" y="257" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#F57F17">guests table</text>
+  <text x="679" y="270" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#F57F17">get_guest_conn()</text>
+  <text x="679" y="280" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="7.5" fill="#9E9E9E">node-filtered in remote</text>
+
+  <rect x="752" y="226" width="130" height="58" rx="4" fill="#FFFDE7" stroke="#F9A825" stroke-width="1.5"/>
+  <text x="817" y="243" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="9" font-weight="700" fill="#E65100">ImageDbOperator</text>
+  <text x="817" y="257" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#F57F17">image table</text>
+  <text x="817" y="270" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#F57F17">get_image_conn()</text>
+  <text x="817" y="280" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="7.5" fill="#9E9E9E">GLOBAL sentinel</text>
+
+  <rect x="890" y="226" width="148" height="58" rx="4" fill="#FFFDE7" stroke="#F9A825" stroke-width="1.5"/>
+  <text x="964" y="243" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="9" font-weight="700" fill="#E65100">FCPDbOperator</text>
+  <text x="964" y="257" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#F57F17">fcp + template</text>
+  <text x="964" y="270" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#F57F17">get_fcp_conn()</text>
+  <text x="964" y="280" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="7.5" fill="#9E9E9E">node-filtered in remote</text>
+
+  <!-- arrow -->
+  <line x1="756" y1="294" x2="756" y2="314" stroke="#546E7A" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Layer 3: zvmsdk/db/ package -->
+  <rect x="466" y="316" width="580" height="118" rx="6" fill="#F3E5F5" stroke="#7B1FA2" stroke-width="2"/>
+  <text x="756" y="335" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="11" font-weight="700" fill="#4A148C">
+    zvmsdk/db/  Package  (new BYODB abstraction layer)
+  </text>
+
+  <rect x="476" y="344" width="178" height="78" rx="4" fill="#EDE7F6" stroke="#9C27B0" stroke-width="1.5"/>
+  <text x="565" y="361" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="10" font-weight="700" fill="#4A148C">api.py</text>
+  <text x="565" y="376" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#6A1B9A">get_engine()  (singleton)</text>
+  <text x="565" y="389" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#6A1B9A">get_connection()  ctx mgr</text>
+  <text x="565" y="402" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#6A1B9A">get_compute_node_id()</text>
+  <text x="565" y="415" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#6A1B9A">register/deregister_node()</text>
+
+  <rect x="662" y="344" width="178" height="78" rx="4" fill="#EDE7F6" stroke="#9C27B0" stroke-width="1.5"/>
+  <text x="751" y="361" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="10" font-weight="700" fill="#4A148C">models.py</text>
+  <text x="751" y="376" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#6A1B9A">SQLAlchemy Table defs</text>
+  <text x="751" y="389" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#6A1B9A">compute_nodes + 7 tables</text>
+  <text x="751" y="402" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#6A1B9A">composite PKs per table</text>
+  <text x="751" y="415" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#6A1B9A">InnoDB / utf8mb4</text>
+
+  <rect x="848" y="344" width="190" height="78" rx="4" fill="#EDE7F6" stroke="#9C27B0" stroke-width="1.5"/>
+  <text x="943" y="361" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="10" font-weight="700" fill="#4A148C">migration.py</text>
+  <text x="943" y="376" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#6A1B9A">ensure_schema_current()</text>
+  <text x="943" y="389" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#6A1B9A">Alembic upgrade('head')</text>
+  <text x="943" y="402" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#6A1B9A">_MIGRATION_LOCK (concurrency)</text>
+  <text x="943" y="415" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#6A1B9A">check/mark_stale_nodes()</text>
+
+  <!-- arrow -->
+  <line x1="756" y1="434" x2="756" y2="454" stroke="#546E7A" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Layer 4: SQLAlchemy Core -->
+  <rect x="466" y="456" width="580" height="62" rx="6" fill="#E8EAF6" stroke="#3F51B5" stroke-width="2"/>
+  <text x="756" y="476" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="11" font-weight="700" fill="#1A237E">
+    SQLAlchemy Core 2.x  +  Alembic
+  </text>
+  <text x="756" y="492" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#283593">
+    engine.begin() auto-commit/rollback  |  text() named :params  |  _CompatRow wrapper
+  </text>
+  <text x="756" y="508" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#283593">
+    URL.create() — password percent-encoded, never in logs  |  dialect-agnostic SQL
+  </text>
+
+  <!-- Fork arrows to two backends -->
+  <line x1="756" y1="518" x2="756" y2="530" stroke="#546E7A" stroke-width="2"/>
+  <line x1="604" y1="530" x2="896" y2="530" stroke="#546E7A" stroke-width="2"/>
+  <line x1="604" y1="530" x2="604" y2="542" stroke="#546E7A" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="896" y1="530" x2="896" y2="542" stroke="#546E7A" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Layer 5a: SQLite backend -->
+  <rect x="466" y="544" width="272" height="72" rx="6" fill="#E8F5E9" stroke="#388E3C" stroke-width="2"/>
+  <text x="602" y="564" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="11" font-weight="700" fill="#1B5E20">SQLite Backend</text>
+  <text x="602" y="579" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#2E7D32">StaticPool (single connection)</text>
+  <text x="602" y="593" text-anchor="middle"
+        font-family="Consolas,'Courier New',monospace" font-size="8" fill="#388E3C">sqlite:///zvmsdk.db</text>
+  <text x="602" y="607" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#2E7D32">check_same_thread=False</text>
+
+  <!-- Layer 5b: MariaDB backend -->
+  <rect x="752" y="544" width="294" height="72" rx="6" fill="#F3E5F5" stroke="#7B1FA2" stroke-width="2"/>
+  <text x="899" y="564" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="11" font-weight="700" fill="#4A148C">MariaDB / MySQL Backend</text>
+  <text x="899" y="579" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#6A1B9A">QueuePool  |  pool_pre_ping=True</text>
+  <text x="899" y="593" text-anchor="middle"
+        font-family="Consolas,'Courier New',monospace" font-size="8" fill="#7B1FA2">mysql+pymysql://  (pure Python — s390x)</text>
+  <text x="899" y="607" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#6A1B9A">pool_size=5  max_overflow=10  recycle=3600</text>
+
+  <!-- arrows to storage -->
+  <line x1="602" y1="616" x2="602" y2="636" stroke="#546E7A" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="899" y1="616" x2="899" y2="636" stroke="#546E7A" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Layer 6: Storage -->
+  <rect x="466" y="638" width="272" height="44" rx="6" fill="#DCEDC8" stroke="#558B2F" stroke-width="2"/>
+  <text x="602" y="658" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#33691E">Local File</text>
+  <text x="602" y="673" text-anchor="middle"
+        font-family="Consolas,'Courier New',monospace" font-size="8" fill="#558B2F">/var/lib/zvmsdk/databases/zvmsdk.db</text>
+
+  <rect x="752" y="638" width="294" height="44" rx="6" fill="#CE93D8" stroke="#7B1FA2" stroke-width="2"/>
+  <text x="899" y="658" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#4A148C">MariaDB Server</text>
+  <text x="899" y="673" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#4A148C">host:3306  |  database: zvmsdk  |  utf8mb4</text>
+
+  <!-- compute_node_id resolution panel -->
+  <rect x="466" y="696" width="580" height="82" rx="6" fill="#FFF3E0" stroke="#E65100" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="756" y="714" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="11" font-weight="700" fill="#BF360C">
+    compute_node_id  Resolution  (once at startup in get_engine())
+  </text>
+  <text x="476" y="730" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#E65100">
+    Priority 1: CONF.database.compute_node_id  — explicit operator override
+  </text>
+  <text x="476" y="744" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#E65100">
+    Priority 2: vmcp query userid  &#x2192; "USERID@ZVM_SYSTEM"  (z/VM guest only)
+  </text>
+  <text x="476" y="758" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#E65100">
+    Priority 3: CONF.network.my_ip  (always available — required=True config field)
+  </text>
+  <text x="476" y="772" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#BF360C">
+    Result stored in _COMPUTE_NODE_ID module global — all operators call get_compute_node_id()
+  </text>
+
+
+  <!-- ╔═══════════════════════════════════════════════════════════════╗ -->
+  <!-- ║   RIGHT COLUMN — DATA MODEL &amp; SCHEMA  (x=1066 .. 1786)      ║ -->
+  <!-- ╚═══════════════════════════════════════════════════════════════╝ -->
+
+  <!-- Column header -->
+  <rect x="1066" y="74" width="720" height="30" rx="4" fill="#263238"/>
+  <text x="1426" y="94" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="12" font-weight="700" fill="#ECEFF1">
+    DATA MODEL  &amp;  SCHEMA EVOLUTION
+  </text>
+
+  <!-- ─── compute_nodes table ─── -->
+  <rect x="1066" y="112" width="354" height="122" rx="4" fill="#FFFFFF" stroke="#546E7A" stroke-width="1.5"/>
+  <rect x="1066" y="112" width="354" height="22" rx="4" fill="#546E7A"/>
+  <rect x="1066" y="122" width="354" height="12" fill="#546E7A"/>
+  <text x="1243" y="128" text-anchor="middle"
+        font-family="Consolas,'Courier New',monospace" font-size="10" font-weight="700" fill="#FFFFFF">compute_nodes  (NEW — node registry)</text>
+  <text x="1072" y="150" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">id           VARCHAR(64)  PK  &lt;-- this IS compute_node_id</text>
+  <text x="1072" y="163" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">hostname     VARCHAR(255)  NOT NULL</text>
+  <text x="1072" y="176" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">ip_address   VARCHAR(45)   NOT NULL  (IPv6 ready)</text>
+  <text x="1072" y="189" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">zvm_host     VARCHAR(255)  (LPAR name)</text>
+  <text x="1072" y="202" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">last_seen    DATETIME  ON UPDATE NOW()</text>
+  <text x="1072" y="215" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">status       VARCHAR(16)  DEFAULT 'active'</text>
+  <text x="1072" y="228" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">registered_at DATETIME  DEFAULT NOW()</text>
+
+  <!-- compute_node_id legend box -->
+  <rect x="1430" y="112" width="356" height="122" rx="4" fill="#FFFFFF" stroke="#E65100" stroke-width="1.5"/>
+  <rect x="1430" y="112" width="356" height="22" rx="4" fill="#E65100"/>
+  <rect x="1430" y="122" width="356" height="12" fill="#E65100"/>
+  <text x="1608" y="128" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#FFFFFF">compute_node_id Strategy</text>
+  <text x="1436" y="150" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">&#x2022; Added to ALL 7 data tables as NOT NULL</text>
+  <text x="1436" y="164" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">&#x2022; Forms composite PK with domain key (fcp_id, etc.)</text>
+  <text x="1436" y="178" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">&#x2022; Local mode: stored but NOT used in query filtering</text>
+  <text x="1436" y="192" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">&#x2022; Remote mode: FK enforced + _node_filter() on reads</text>
+  <text x="1436" y="206" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">&#x2022; image table: DEFAULT 'GLOBAL' (shared images)</text>
+  <text x="1436" y="220" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#37474F">&#x2022; ON DELETE CASCADE from compute_nodes (remote only)</text>
+  <text x="1436" y="234" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#E65100">&#x2022; Two nodes can hold same fcp_id — PK is composite</text>
+
+  <!-- Data tables section header -->
+  <rect x="1066" y="244" width="720" height="20" rx="4" fill="#37474F"/>
+  <text x="1426" y="258" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#B0BEC5">
+    DATA TABLES  (all 7 tables — with compute_node_id column highlighted in orange)
+  </text>
+
+  <!-- Row 1: guests, switch, image, fcp -->
+  <rect x="1066" y="270" width="168" height="102" rx="4" fill="#FFFFFF" stroke="#1565C0" stroke-width="1.5"/>
+  <rect x="1066" y="270" width="168" height="20" rx="4" fill="#1565C0"/>
+  <rect x="1066" y="279" width="168" height="11" fill="#1565C0"/>
+  <text x="1150" y="285" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="9.5" font-weight="700" fill="#FFFFFF">guests</text>
+  <text x="1072" y="302" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">id       CHAR(36)  PK</text>
+  <text x="1072" y="314" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">userid   VARCHAR(8)</text>
+  <text x="1072" y="326" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#E65100">node_id  VARCHAR(64)</text>
+  <text x="1072" y="338" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">metadata VARCHAR(255)</text>
+  <text x="1072" y="350" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">net_set  SMALLINT</text>
+  <text x="1072" y="362" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">comments TEXT</text>
+
+  <rect x="1242" y="270" width="168" height="102" rx="4" fill="#FFFFFF" stroke="#1565C0" stroke-width="1.5"/>
+  <rect x="1242" y="270" width="168" height="20" rx="4" fill="#1565C0"/>
+  <rect x="1242" y="279" width="168" height="11" fill="#1565C0"/>
+  <text x="1326" y="285" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="9.5" font-weight="700" fill="#FFFFFF">switch</text>
+  <text x="1248" y="302" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">userid   VARCHAR(8)  PK</text>
+  <text x="1248" y="314" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">iface    VARCHAR(4)  PK</text>
+  <text x="1248" y="326" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#E65100">node_id  VARCHAR(64) PK</text>
+  <text x="1248" y="338" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">switch   VARCHAR(8)</text>
+  <text x="1248" y="350" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">port     VARCHAR(128)</text>
+  <text x="1248" y="362" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">comments VARCHAR(128)</text>
+
+  <rect x="1418" y="270" width="178" height="102" rx="4" fill="#FFFFFF" stroke="#1565C0" stroke-width="1.5"/>
+  <rect x="1418" y="270" width="178" height="20" rx="4" fill="#1565C0"/>
+  <rect x="1418" y="279" width="178" height="11" fill="#1565C0"/>
+  <text x="1507" y="285" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="9.5" font-weight="700" fill="#FFFFFF">image</text>
+  <text x="1424" y="302" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">imagename  VARCHAR(128) PK</text>
+  <text x="1424" y="314" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#E65100">node_id    VARCHAR(64)  PK</text>
+  <text x="1424" y="326" font-family="Consolas,'Courier New',monospace" font-size="7.5" fill="#5D4037">  DEFAULT 'GLOBAL' (shared imgs)</text>
+  <text x="1424" y="338" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">md5sum     VARCHAR(512)</text>
+  <text x="1424" y="350" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">type       VARCHAR(16)</text>
+  <text x="1424" y="362" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">comments   VARCHAR(128)</text>
+
+  <rect x="1604" y="270" width="182" height="102" rx="4" fill="#FFFFFF" stroke="#1565C0" stroke-width="1.5"/>
+  <rect x="1604" y="270" width="182" height="20" rx="4" fill="#1565C0"/>
+  <rect x="1604" y="279" width="182" height="11" fill="#1565C0"/>
+  <text x="1695" y="285" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="9.5" font-weight="700" fill="#FFFFFF">fcp</text>
+  <text x="1610" y="302" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">fcp_id    CHAR(4)  PK</text>
+  <text x="1610" y="314" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#E65100">node_id   VARCHAR(64) PK</text>
+  <text x="1610" y="326" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">assigner  VARCHAR(8)</text>
+  <text x="1610" y="338" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">chpid     CHAR(2)</text>
+  <text x="1610" y="350" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">pchid     CHAR(4)</text>
+  <text x="1610" y="362" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">tmpl_id   VARCHAR(32)</text>
+
+  <!-- Row 2: template, template_sp_mapping, template_fcp_mapping -->
+  <rect x="1066" y="380" width="195" height="100" rx="4" fill="#FFFFFF" stroke="#1565C0" stroke-width="1.5"/>
+  <rect x="1066" y="380" width="195" height="20" rx="4" fill="#1565C0"/>
+  <rect x="1066" y="389" width="195" height="11" fill="#1565C0"/>
+  <text x="1163" y="395" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="9.5" font-weight="700" fill="#FFFFFF">template</text>
+  <text x="1072" y="412" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">id         VARCHAR(32) PK</text>
+  <text x="1072" y="424" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#E65100">node_id    VARCHAR(64) PK</text>
+  <text x="1072" y="436" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">name       VARCHAR(128)</text>
+  <text x="1072" y="448" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">is_default BOOLEAN</text>
+  <text x="1072" y="460" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">min_fcp_paths INT</text>
+  <text x="1072" y="472" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">description VARCHAR(255)</text>
+
+  <rect x="1270" y="380" width="240" height="100" rx="4" fill="#FFFFFF" stroke="#1565C0" stroke-width="1.5"/>
+  <rect x="1270" y="380" width="240" height="20" rx="4" fill="#1565C0"/>
+  <rect x="1270" y="389" width="240" height="11" fill="#1565C0"/>
+  <text x="1390" y="395" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="9.5" font-weight="700" fill="#FFFFFF">template_sp_mapping</text>
+  <text x="1276" y="412" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">sp_name   VARCHAR(128) PK</text>
+  <text x="1276" y="424" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#E65100">node_id   VARCHAR(64)  PK</text>
+  <text x="1276" y="436" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">tmpl_id   VARCHAR(32)</text>
+  <text x="1276" y="448" font-family="Consolas,'Courier New',monospace" font-size="7.5" fill="#546E7A">FK &#x2192; template(id, node_id)</text>
+  <text x="1276" y="460" font-family="Consolas,'Courier New',monospace" font-size="7.5" fill="#546E7A">ON DELETE CASCADE</text>
+
+  <rect x="1520" y="380" width="266" height="100" rx="4" fill="#FFFFFF" stroke="#1565C0" stroke-width="1.5"/>
+  <rect x="1520" y="380" width="266" height="20" rx="4" fill="#1565C0"/>
+  <rect x="1520" y="389" width="266" height="11" fill="#1565C0"/>
+  <text x="1653" y="395" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="9.5" font-weight="700" fill="#FFFFFF">template_fcp_mapping</text>
+  <text x="1526" y="412" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">fcp_id    CHAR(4)     PK</text>
+  <text x="1526" y="424" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">tmpl_id   VARCHAR(32) PK</text>
+  <text x="1526" y="436" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#E65100">node_id   VARCHAR(64) PK</text>
+  <text x="1526" y="448" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#263238">path      INTEGER</text>
+  <text x="1526" y="460" font-family="Consolas,'Courier New',monospace" font-size="7.5" fill="#546E7A">FK &#x2192; template(id, node_id)  CASCADE</text>
+  <text x="1526" y="472" font-family="Consolas,'Courier New',monospace" font-size="7.5" fill="#546E7A">FK &#x2192; fcp(fcp_id, node_id)  CASCADE</text>
+
+  <!-- Remote-mode FK warning -->
+  <rect x="1066" y="488" width="720" height="18" rx="4" fill="#FCE4EC" stroke="#C62828" stroke-width="1"/>
+  <text x="1426" y="501" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#B71C1C">
+    REMOTE MODE ONLY: FK constraints from all 7 tables &#x2192; compute_nodes.id  (added by migration 0004, no-op in local mode)
+  </text>
+
+  <!-- Alembic chain section -->
+  <rect x="1066" y="514" width="720" height="20" rx="4" fill="#37474F"/>
+  <text x="1426" y="528" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#B0BEC5">
+    ALEMBIC MIGRATION CHAIN  (auto-applied at startup via ensure_schema_current())
+  </text>
+
+  <!-- Migration boxes -->
+  <rect x="1066" y="540" width="162" height="78" rx="4" fill="#FFFFFF" stroke="#546E7A" stroke-width="1.5"/>
+  <rect x="1066" y="540" width="162" height="20" rx="4" fill="#546E7A"/>
+  <rect x="1066" y="549" width="162" height="11" fill="#546E7A"/>
+  <text x="1147" y="555" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="9" font-weight="700" fill="#FFFFFF">0001</text>
+  <text x="1072" y="573" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#263238">SQLite baseline</text>
+  <text x="1072" y="585" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#263238">All 7 tables</text>
+  <text x="1072" y="597" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#263238">No compute_node_id</text>
+  <text x="1072" y="609" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#757575">existing installs</text>
+
+  <line x1="1228" y1="579" x2="1248" y2="579" stroke="#546E7A" stroke-width="2" marker-end="url(#arr)"/>
+
+  <rect x="1252" y="540" width="162" height="78" rx="4" fill="#FFFFFF" stroke="#546E7A" stroke-width="1.5"/>
+  <rect x="1252" y="540" width="162" height="20" rx="4" fill="#546E7A"/>
+  <rect x="1252" y="549" width="162" height="11" fill="#546E7A"/>
+  <text x="1333" y="555" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="9" font-weight="700" fill="#FFFFFF">0002</text>
+  <text x="1258" y="573" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#263238">MariaDB baseline</text>
+  <text x="1258" y="585" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#263238">InnoDB + utf8mb4</text>
+  <text x="1258" y="597" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#263238">All 7 tables</text>
+  <text x="1258" y="609" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#757575">no-op for SQLite</text>
+
+  <line x1="1414" y1="579" x2="1434" y2="579" stroke="#546E7A" stroke-width="2" marker-end="url(#arr)"/>
+
+  <rect x="1438" y="540" width="177" height="78" rx="4" fill="#FFFFFF" stroke="#546E7A" stroke-width="1.5"/>
+  <rect x="1438" y="540" width="177" height="20" rx="4" fill="#546E7A"/>
+  <rect x="1438" y="549" width="177" height="11" fill="#546E7A"/>
+  <text x="1526" y="555" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="9" font-weight="700" fill="#FFFFFF">0003</text>
+  <text x="1444" y="573" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#263238">+compute_node_id col</text>
+  <text x="1444" y="585" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#263238">+compute_nodes table</text>
+  <text x="1444" y="597" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#263238">Expand composite PKs</text>
+  <text x="1444" y="609" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#757575">backfill existing rows</text>
+
+  <line x1="1615" y1="579" x2="1635" y2="579" stroke="#546E7A" stroke-width="2" marker-end="url(#arr)"/>
+
+  <rect x="1638" y="540" width="148" height="78" rx="4" fill="#FFFFFF" stroke="#546E7A" stroke-width="1.5"/>
+  <rect x="1638" y="540" width="148" height="20" rx="4" fill="#546E7A"/>
+  <rect x="1638" y="549" width="148" height="11" fill="#546E7A"/>
+  <text x="1712" y="555" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="9" font-weight="700" fill="#FFFFFF">0004</text>
+  <text x="1644" y="573" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#263238">+FK constraints</text>
+  <text x="1644" y="585" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#263238">remote mode only</text>
+  <text x="1644" y="597" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#263238">ON DELETE CASCADE</text>
+  <text x="1644" y="609" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#757575">no-op in local mode</text>
+
+  <!-- Test coverage badge -->
+  <rect x="1066" y="628" width="720" height="52" rx="4" fill="#E8F5E9" stroke="#388E3C" stroke-width="1.5"/>
+  <text x="1426" y="647" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="11" font-weight="700" fill="#1B5E20">
+    Test Coverage — 9 Phases Complete
+  </text>
+  <text x="1426" y="663" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#2E7D32">
+    202 PASS  |  26 SKIP (MariaDB — require ZVMSDK_TEST_DB_URL)  |  0 FAIL
+  </text>
+  <text x="1426" y="675" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#388E3C">
+    test_database(84) | test_remote_mode(12) | test_concurrent_startup(10) | test_migrate_tool(19) | test_hardening(18) | +8 more files
+  </text>
+
+  <!-- Tech Stack -->
+  <rect x="1066" y="690" width="720" height="90" rx="4" fill="#FFFFFF" stroke="#37474F" stroke-width="1"/>
+  <rect x="1066" y="690" width="720" height="18" rx="4" fill="#455A64"/>
+  <rect x="1066" y="697" width="720" height="11" fill="#455A64"/>
+  <text x="1426" y="703" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="9" font-weight="700" fill="#ECEFF1">TECH STACK</text>
+  <text x="1072" y="722" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#263238">&#x2022; SQLAlchemy Core 2.x  — dialect abstraction (not ORM); preserves ~2600 lines of hand-written SQL</text>
+  <text x="1072" y="735" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#263238">&#x2022; Alembic — schema versioning; advisory lock for concurrent multi-node migration safety</text>
+  <text x="1072" y="748" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#263238">&#x2022; PyMySQL (pure Python) — no C extension; works on s390x IBM Z architecture</text>
+  <text x="1072" y="761" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#263238">&#x2022; _CompatRow wrapper — allows both row[0] (positional) and row['col'] (named) access on SQLAlchemy Row</text>
+  <text x="1072" y="774" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#263238">&#x2022; Deprecated: DATABASE_NETWORK, DATABASE_GUEST, DATABASE_IMAGE, DATABASE_FCP constants</text>
+
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════════╗ -->
+  <!-- ║              BOTTOM ROW  (y=800 .. 1090)                               ║ -->
+  <!-- ╚══════════════════════════════════════════════════════════════════════════╝ -->
+
+  <!-- ─── LEFT BOTTOM: STARTUP SEQUENCE ─── -->
+  <rect x="12" y="800" width="430" height="22" rx="4" fill="#263238"/>
+  <text x="227" y="815" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="11" font-weight="700" fill="#ECEFF1">
+    STARTUP SEQUENCE  (smtclient.py)
+  </text>
+
+  <!-- Flow boxes -->
+  <rect x="12"  y="830" width="70" height="44" rx="4" fill="#E3F2FD" stroke="#1565C0" stroke-width="1.5"/>
+  <text x="47"  y="847" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="8" font-weight="700" fill="#0D47A1">load</text>
+  <text x="47"  y="858" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#1565C0">config()</text>
+  <text x="47"  y="869" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="7" fill="#9E9E9E">zvmsdk.conf</text>
+
+  <line x1="82" y1="852" x2="95" y2="852" stroke="#1565C0" stroke-width="1.5" marker-end="url(#arr-b)"/>
+
+  <rect x="98"  y="830" width="72" height="44" rx="4" fill="#E3F2FD" stroke="#1565C0" stroke-width="1.5"/>
+  <text x="134" y="845" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="7.5" font-weight="700" fill="#0D47A1">ensure</text>
+  <text x="134" y="856" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="7.5" fill="#1565C0">schema</text>
+  <text x="134" y="867" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="7.5" fill="#1565C0">current()</text>
+
+  <line x1="170" y1="852" x2="183" y2="852" stroke="#1565C0" stroke-width="1.5" marker-end="url(#arr-b)"/>
+
+  <rect x="186" y="830" width="76" height="44" rx="4" fill="#EDE7F6" stroke="#7B1FA2" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <text x="224" y="844" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="7.5" font-weight="700" fill="#4A148C">verify</text>
+  <text x="224" y="855" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="7.5" fill="#6A1B9A">remote</text>
+  <text x="224" y="866" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="7.5" fill="#6A1B9A">connect()</text>
+  <text x="224" y="870" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="6.5" fill="#9C27B0">remote only</text>
+
+  <line x1="262" y1="852" x2="275" y2="852" stroke="#1565C0" stroke-width="1.5" marker-end="url(#arr-b)"/>
+
+  <rect x="278" y="830" width="76" height="44" rx="4" fill="#E3F2FD" stroke="#1565C0" stroke-width="1.5"/>
+  <text x="316" y="844" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="7.5" font-weight="700" fill="#0D47A1">register</text>
+  <text x="316" y="855" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="7.5" fill="#1565C0">compute</text>
+  <text x="316" y="866" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="7.5" fill="#1565C0">_node()</text>
+  <text x="316" y="870" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="6.5" fill="#9E9E9E">UPSERT</text>
+
+  <line x1="354" y1="852" x2="367" y2="852" stroke="#1565C0" stroke-width="1.5" marker-end="url(#arr-b)"/>
+
+  <rect x="370" y="830" width="72" height="44" rx="4" fill="#E8F5E9" stroke="#388E3C" stroke-width="1.5"/>
+  <text x="406" y="844" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="7.5" font-weight="700" fill="#1B5E20">check</text>
+  <text x="406" y="855" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="7.5" fill="#2E7D32">stale</text>
+  <text x="406" y="866" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="7.5" fill="#2E7D32">nodes()</text>
+  <text x="406" y="870" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="6.5" fill="#9E9E9E">swallows err</text>
+
+  <!-- Ready bar -->
+  <rect x="12" y="882" width="430" height="26" rx="4" fill="#1B5E20"/>
+  <text x="227" y="900" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="12" font-weight="700" fill="#FFFFFF">
+    &#x2713;  Ready to serve requests
+  </text>
+
+  <!-- Startup notes -->
+  <text x="18" y="923" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#37474F">&#x2022; register_compute_node() uses UPSERT — idempotent on restart</text>
+  <text x="18" y="936" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#37474F">&#x2022; check_stale_nodes() swallows all exceptions — startup must not fail</text>
+  <text x="18" y="949" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#37474F">&#x2022; _MIGRATION_LOCK serialises concurrent Alembic callers in-process</text>
+  <text x="18" y="962" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#37474F">&#x2022; deregister_compute_node() on clean shutdown (sets status=inactive)</text>
+  <text x="18" y="975" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#37474F">&#x2022; Stale: NOW() - INTERVAL :s SECOND (MariaDB) / datetime('now','-Ns') (SQLite)</text>
+  <text x="18" y="988" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#37474F">&#x2022; Pool event listeners track lifetime_checked_out / invalidated counters</text>
+  <text x="18" y="1001" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#37474F">&#x2022; _CONN_LOCAL (thread-local): nested get_connection() reuses same txn</text>
+
+
+  <!-- ─── CENTER BOTTOM: SECURITY &amp; CONFIG ─── -->
+  <rect x="466" y="800" width="580" height="22" rx="4" fill="#263238"/>
+  <text x="756" y="815" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="11" font-weight="700" fill="#ECEFF1">
+    SECURITY,  CREDENTIALS  &amp;  CONFIGURATION
+  </text>
+
+  <!-- TLS box -->
+  <rect x="466" y="830" width="185" height="100" rx="4" fill="#FFFFFF" stroke="#C62828" stroke-width="1.5"/>
+  <rect x="466" y="830" width="185" height="20" rx="4" fill="#C62828"/>
+  <rect x="466" y="839" width="185" height="11" fill="#C62828"/>
+  <text x="558" y="845" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#FFFFFF">TLS / SSL</text>
+  <text x="472" y="863" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#37474F">ssl_ca   = ca-cert.pem</text>
+  <text x="472" y="876" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#37474F">ssl_cert = client-cert.pem</text>
+  <text x="472" y="889" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#37474F">ssl_key  = client-key.pem</text>
+  <text x="472" y="902" font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#757575">Verify: SHOW STATUS 'Ssl_cipher'</text>
+  <text x="472" y="915" font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#C62828">require_secure_transport=ON</text>
+  <text x="472" y="926" font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#757575">mTLS supported (client cert)</text>
+
+  <!-- Credentials box -->
+  <rect x="659" y="830" width="185" height="100" rx="4" fill="#FFFFFF" stroke="#C62828" stroke-width="1.5"/>
+  <rect x="659" y="830" width="185" height="20" rx="4" fill="#C62828"/>
+  <rect x="659" y="839" width="185" height="11" fill="#C62828"/>
+  <text x="751" y="845" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#FFFFFF">Credential Hardening</text>
+  <text x="665" y="863" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#37474F">ZVMSDK_DB_PASSWORD env var</text>
+  <text x="665" y="876" font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#37474F">config wins if set; env = fallback</text>
+  <text x="665" y="889" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#37474F">URL.create() — %s-encode pw</text>
+  <text x="665" y="902" font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#37474F">password never appears in logs</text>
+  <text x="665" y="915" font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#2E7D32">bandit: 0 medium/high findings</text>
+  <text x="665" y="926" font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#757575">5 low # nosec with justification</text>
+
+  <!-- Pool monitoring box -->
+  <rect x="852" y="830" width="194" height="100" rx="4" fill="#FFFFFF" stroke="#C62828" stroke-width="1.5"/>
+  <rect x="852" y="830" width="194" height="20" rx="4" fill="#C62828"/>
+  <rect x="852" y="839" width="194" height="11" fill="#C62828"/>
+  <text x="949" y="845" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#FFFFFF">Pool Monitoring</text>
+  <text x="858" y="863" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#37474F">get_pool_status()</text>
+  <text x="858" y="876" font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#37474F">pool_size, checked_out, overflow</text>
+  <text x="858" y="889" font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#37474F">lifetime_checked_out / checked_in</text>
+  <text x="858" y="902" font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#37474F">lifetime_invalidated counter</text>
+  <text x="858" y="915" font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#2E7D32">pool_pre_ping=True (MariaDB)</text>
+  <text x="858" y="926" font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#757575">event.listens_for on checkout</text>
+
+  <!-- Config section -->
+  <rect x="466" y="940" width="580" height="138" rx="4" fill="#FFFFFF" stroke="#455A64" stroke-width="1.5"/>
+  <rect x="466" y="940" width="580" height="20" rx="4" fill="#455A64"/>
+  <rect x="466" y="949" width="580" height="11" fill="#455A64"/>
+  <text x="756" y="955" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#FFFFFF">
+    zvmsdk.conf  [database]  —  17+ New Options
+  </text>
+
+  <!-- Left config col -->
+  <text x="472" y="975" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">backend = sqlite | mariadb | mysql</text>
+  <text x="472" y="987" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">mode    = local  | remote</text>
+  <text x="472" y="999" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">host / port / name / user / password</text>
+  <text x="472" y="1011" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">compute_node_id  (auto-detected)</text>
+  <text x="472" y="1023" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">dir  (SQLite file directory)</text>
+  <text x="472" y="1035" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">connection  (full SQLAlchemy URL)</text>
+  <text x="472" y="1047" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">alembic_config  (optional override)</text>
+  <text x="472" y="1059" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">ssl_ca / ssl_cert / ssl_key</text>
+
+  <!-- Right config col -->
+  <text x="695" y="975"  font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">pool_size         = 5</text>
+  <text x="695" y="987"  font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">pool_max_overflow = 10</text>
+  <text x="695" y="999"  font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">pool_timeout      = 30</text>
+  <text x="695" y="1011" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#263238">pool_recycle      = 3600</text>
+  <text x="695" y="1023" font-family="'Segoe UI',Arial,sans-serif"       font-size="8.5" fill="#37474F">Deprecated constants in constants.py:</text>
+  <text x="695" y="1035" font-family="Consolas,'Courier New',monospace" font-size="7.5" fill="#9E9E9E">DATABASE_NETWORK, DATABASE_GUEST,</text>
+  <text x="695" y="1047" font-family="Consolas,'Courier New',monospace" font-size="7.5" fill="#9E9E9E">DATABASE_IMAGE, DATABASE_FCP</text>
+  <text x="695" y="1059" font-family="'Segoe UI',Arial,sans-serif"       font-size="8" fill="#C62828">(all deprecated with notice)</text>
+
+
+  <!-- ─── RIGHT BOTTOM: MIGRATION TOOL &amp; COMPAT ─── -->
+  <rect x="1066" y="800" width="720" height="22" rx="4" fill="#263238"/>
+  <text x="1426" y="815" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="11" font-weight="700" fill="#ECEFF1">
+    DATA MIGRATION TOOL  &amp;  BACKWARD COMPATIBILITY
+  </text>
+
+  <!-- Source box -->
+  <rect x="1066" y="830" width="200" height="100" rx="4" fill="#FFF3E0" stroke="#E65100" stroke-width="1.5"/>
+  <rect x="1066" y="830" width="200" height="20" rx="4" fill="#E65100"/>
+  <rect x="1066" y="839" width="200" height="11" fill="#E65100"/>
+  <text x="1166" y="845" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#FFFFFF">Source  (never modified)</text>
+  <text x="1072" y="863" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#37474F">sdk_network.sqlite</text>
+  <text x="1072" y="875" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#37474F">sdk_guest.sqlite</text>
+  <text x="1072" y="887" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#37474F">sdk_image.sqlite</text>
+  <text x="1072" y="899" font-family="Consolas,'Courier New',monospace" font-size="8.5" fill="#37474F">sdk_fcp.sqlite</text>
+  <text x="1072" y="920" font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#E65100">4 old per-domain files</text>
+
+  <line x1="1266" y1="880" x2="1294" y2="880" stroke="#E65100" stroke-width="2" marker-end="url(#arr-o)"/>
+
+  <!-- Script box -->
+  <rect x="1298" y="830" width="230" height="100" rx="4" fill="#FFF3E0" stroke="#E65100" stroke-width="2"/>
+  <rect x="1298" y="830" width="230" height="20" rx="4" fill="#E65100"/>
+  <rect x="1298" y="839" width="230" height="11" fill="#E65100"/>
+  <text x="1413" y="845" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#FFFFFF">Migration Script</text>
+  <text x="1304" y="862" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#37474F">migrate_sqlite_to_mariadb.py</text>
+  <text x="1304" y="874" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#37474F">--sqlite-dir  (source path)</text>
+  <text x="1304" y="886" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#37474F">--target-backend  sqlite|mariadb</text>
+  <text x="1304" y="898" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#37474F">--compute-node-id  (injected)</text>
+  <text x="1304" y="910" font-family="Consolas,'Courier New',monospace" font-size="8" fill="#37474F">--dry-run  (counts only)</text>
+  <text x="1304" y="922" font-family="'Segoe UI',Arial,sans-serif" font-size="8" fill="#E65100">INSERT IGNORE | batch=500</text>
+
+  <line x1="1528" y1="880" x2="1556" y2="880" stroke="#E65100" stroke-width="2" marker-end="url(#arr-o)"/>
+
+  <!-- Target box -->
+  <rect x="1560" y="830" width="226" height="100" rx="4" fill="#FFF3E0" stroke="#E65100" stroke-width="1.5"/>
+  <rect x="1560" y="830" width="226" height="20" rx="4" fill="#E65100"/>
+  <rect x="1560" y="839" width="226" height="11" fill="#E65100"/>
+  <text x="1673" y="845" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="10" font-weight="700" fill="#FFFFFF">Target</text>
+  <text x="1566" y="863" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#37474F">&#x2022; New consolidated SQLite, OR</text>
+  <text x="1566" y="875" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#37474F">&#x2022; Centralized MariaDB/MySQL</text>
+  <text x="1566" y="887" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#37474F">&#x2022; Schema auto-upgraded (Alembic)</text>
+  <text x="1566" y="899" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#37474F">&#x2022; Row count verified per table</text>
+  <text x="1566" y="911" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#2E7D32">&#x2022; Idempotent — safe to re-run</text>
+  <text x="1566" y="923" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#37474F">&#x2022; Exit 1 on count mismatch</text>
+
+  <!-- Migration details -->
+  <rect x="1066" y="940" width="720" height="50" rx="4" fill="#FFFFFF" stroke="#455A64" stroke-width="1"/>
+  <text x="1072" y="957" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#37474F">
+    &#x2022; SOURCE_MAP: per-table column mapping with src_cols + tgt_cols (including compute_node_id)
+  </text>
+  <text x="1072" y="969" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#37474F">
+    &#x2022; _inject_node_id(): stamps every migrated row with compute_node_id — image rows always get 'GLOBAL'
+  </text>
+  <text x="1072" y="981" font-family="'Segoe UI',Arial,sans-serif" font-size="8.5" fill="#37474F">
+    &#x2022; Source SQLite files are NEVER modified — re-running with INSERT IGNORE skips already-migrated rows
+  </text>
+
+  <!-- Backward compat -->
+  <rect x="1066" y="998" width="720" height="78" rx="4" fill="#E8F5E9" stroke="#388E3C" stroke-width="1.5"/>
+  <text x="1426" y="1016" text-anchor="middle"
+        font-family="'Segoe UI',Arial,sans-serif" font-size="11" font-weight="700" fill="#1B5E20">
+    Backward Compatibility Guarantee
+  </text>
+  <text x="1072" y="1032" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#2E7D32">
+    &#x2713; Default: backend=sqlite, mode=local — existing deployments need ZERO config changes
+  </text>
+  <text x="1072" y="1046" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#2E7D32">
+    &#x2713; SQLite path uses StaticPool — identical behavior to legacy sqlite3 single-connection pattern
+  </text>
+  <text x="1072" y="1060" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#2E7D32">
+    &#x2713; compute_node_id stored in all rows but local mode never uses it in WHERE clauses
+  </text>
+  <text x="1072" y="1074" font-family="'Segoe UI',Arial,sans-serif" font-size="9" fill="#2E7D32">
+    &#x2713; Rollback: set backend=sqlite in zvmsdk.conf and restart — source SQLite files untouched
+  </text>
+
+  <!-- ===================== FOOTER ===================== -->
+  <rect x="0" y="1092" width="1800" height="8" fill="#0D47A1"/>
+
+</svg>

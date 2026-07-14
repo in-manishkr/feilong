@@ -521,6 +521,114 @@ tell SDK where to store the database files, make sure the process
 running SDK is able to read write and execute the directory.
 '''
         ),
+    Opt('backend',
+        section='database',
+        default='sqlite',
+        opt_type='str',
+        help='Database backend to use. Values: sqlite (default), mariadb, mysql'
+        ),
+    Opt('mode',
+        section='database',
+        default='local',
+        opt_type='str',
+        help='Deployment mode. Values: local (default, each node has its own '
+             'DB) or remote (all nodes share a centralized DB).'
+        ),
+    Opt('connection',
+        section='database',
+        default=None,
+        opt_type='str',
+        help='SQLAlchemy connection URL. If set, overrides host/port/user/'
+             'password/name. Example: '
+             'mysql+pymysql://zvmsdk:pass@db-host:3306/zvmsdk?charset=utf8mb4'
+        ),
+    Opt('host',
+        section='database',
+        default='127.0.0.1',
+        opt_type='str',
+        help='Hostname or IP of the MariaDB/MySQL server.'
+        ),
+    Opt('port',
+        section='database',
+        default=3306,
+        opt_type='int',
+        help='Port of the MariaDB/MySQL server.'
+        ),
+    Opt('name',
+        section='database',
+        default='zvmsdk',
+        opt_type='str',
+        help='Name of the database to connect to.'
+        ),
+    Opt('user',
+        section='database',
+        default='zvmsdk',
+        opt_type='str',
+        help='Database user name.'
+        ),
+    Opt('password',
+        section='database',
+        default='',
+        opt_type='str',
+        help='Database password. Consider using the ZVMSDK_DB_PASSWORD '
+             'environment variable instead of storing the password in plain text.'
+        ),
+    Opt('compute_node_id',
+        section='database',
+        default=None,
+        opt_type='str',
+        help='Unique identifier for this compute node used to scope rows in '
+             'remote mode. Auto-detected if not set (vmcp userid or my_ip).'
+        ),
+    Opt('pool_size',
+        section='database',
+        default=5,
+        opt_type='int',
+        help='Number of persistent connections to keep in the connection pool.'
+        ),
+    Opt('pool_max_overflow',
+        section='database',
+        default=10,
+        opt_type='int',
+        help='Maximum number of connections allowed beyond pool_size under load.'
+        ),
+    Opt('pool_timeout',
+        section='database',
+        default=30,
+        opt_type='int',
+        help='Seconds to wait for a connection from the pool before raising.'
+        ),
+    Opt('pool_recycle',
+        section='database',
+        default=3600,
+        opt_type='int',
+        help='Seconds before a connection is recycled to avoid stale connections.'
+        ),
+    Opt('alembic_config',
+        section='database',
+        default=None,
+        opt_type='str',
+        help='Path to alembic.ini. Defaults to the file bundled with the '
+             'installed package.'
+        ),
+    Opt('ssl_ca',
+        section='database',
+        default=None,
+        opt_type='str',
+        help='Path to CA certificate for TLS (e.g. /etc/zvmsdk/ssl/ca-cert.pem).'
+        ),
+    Opt('ssl_cert',
+        section='database',
+        default=None,
+        opt_type='str',
+        help='Path to client certificate for mutual TLS.'
+        ),
+    Opt('ssl_key',
+        section='database',
+        default=None,
+        opt_type='str',
+        help='Path to client private key for mutual TLS.'
+        ),
     Opt('refresh_bootmap_timeout',
         section='volume',
         default=1200,

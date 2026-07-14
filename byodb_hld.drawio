@@ -1,0 +1,598 @@
+<mxfile host="app.diagrams.net" modified="2026-07-14T12:00:00.000Z" agent="Claude" version="21.0.0" type="device">
+  <diagram id="byodb-hld" name="Feilong BYODB HLD">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="3200" pageHeight="1500" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ═══════════════════════════════════════════ TITLE ═══════════════════════════════════════════ -->
+        <mxCell id="10" value="&lt;b style=&quot;font-size:18px;&quot;&gt;Feilong (z/VM Cloud Connector) — Bring Your Own Database (BYODB)&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:13px;font-weight:normal;&quot;&gt;High Level Design  |  9 Phases Complete  |  202 Tests Pass  |  Branch: byodb&lt;/span&gt;"
+          style="text;html=1;strokeColor=none;fillColor=#0D47A1;align=center;verticalAlign=middle;fontColor=#FFFFFF;rounded=1;fontSize=14;"
+          vertex="1" parent="1">
+          <mxGeometry x="0" y="0" width="3200" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ LEFT COLUMN HEADER ═══════════════════════════════════════════ -->
+        <mxCell id="11" value="DEPLOYMENT TOPOLOGIES"
+          style="text;html=1;strokeColor=none;fillColor=#263238;align=center;fontColor=#ECEFF1;fontSize=12;fontStyle=1;verticalAlign=middle;rounded=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="82" width="540" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- ─── LOCAL MODE ─── -->
+        <mxCell id="20" value=""
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#388E3C;strokeWidth=2;verticalAlign=top;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="120" width="540" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="21" value="LOCAL MODE  (default — backward compatible)"
+          style="text;html=1;strokeColor=none;fillColor=#388E3C;align=center;fontColor=#FFFFFF;fontSize=11;fontStyle=1;verticalAlign=middle;rounded=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="120" width="540" height="26" as="geometry" />
+        </mxCell>
+
+        <mxCell id="22" value="&lt;b&gt;Compute Node A&lt;/b&gt;&lt;br&gt;feilong daemon&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;backend=sqlite&lt;/font&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;strokeWidth=2;fontSize=10;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="32" y="158" width="186" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="23" value="&lt;b&gt;SQLite&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;zvmsdk.db&lt;/font&gt;&lt;br&gt;StaticPool"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F8E9;strokeColor=#558B2F;strokeWidth=2;fontSize=10;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="268" y="158" width="130" height="58" as="geometry" />
+        </mxCell>
+
+        <mxCell id="24" value="&lt;b&gt;Compute Node B&lt;/b&gt;&lt;br&gt;feilong daemon&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;backend=mariadb&lt;/font&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;strokeWidth=2;fontSize=10;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="32" y="230" width="186" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="25" value="&lt;b&gt;MariaDB&lt;/b&gt;&lt;br&gt;localhost:3306&lt;br&gt;QueuePool"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F8E9;strokeColor=#558B2F;strokeWidth=2;fontSize=10;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="268" y="230" width="130" height="58" as="geometry" />
+        </mxCell>
+
+        <mxCell id="26" value="✓ Each node has its own independent database&lt;br&gt;✓ compute_node_id stored but NOT used in query filtering&lt;br&gt;✓ Zero config change required for existing deployments"
+          style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=9;fontColor=#37474F;"
+          vertex="1" parent="1">
+          <mxGeometry x="32" y="302" width="520" height="62" as="geometry" />
+        </mxCell>
+
+        <!-- ─── REMOTE MODE ─── -->
+        <mxCell id="27" value=""
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7B1FA2;strokeWidth=2;verticalAlign=top;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="398" width="540" height="578" as="geometry" />
+        </mxCell>
+        <mxCell id="28" value="REMOTE MODE  (multi-node OpenStack deployment)"
+          style="text;html=1;strokeColor=none;fillColor=#7B1FA2;align=center;fontColor=#FFFFFF;fontSize=11;fontStyle=1;verticalAlign=middle;rounded=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="398" width="540" height="26" as="geometry" />
+        </mxCell>
+
+        <mxCell id="29" value="&lt;b&gt;Centralized MariaDB / MySQL&lt;/b&gt;&lt;br&gt;Management Node — TCP 3306&lt;br&gt;HA: Galera Cluster  |  ProxySQL&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;database=zvmsdk  charset=utf8mb4&lt;/font&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE7F6;strokeColor=#7B1FA2;strokeWidth=2;fontSize=10;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="110" y="440" width="320" height="78" as="geometry" />
+        </mxCell>
+
+        <mxCell id="30" value="&lt;b&gt;Compute A&lt;/b&gt;&lt;br&gt;feilong&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;node_id=A&lt;/font&gt;&lt;br&gt;mode=remote"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=2;fontSize=10;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="32" y="568" width="154" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="31" value="&lt;b&gt;Compute B&lt;/b&gt;&lt;br&gt;feilong&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;node_id=B&lt;/font&gt;&lt;br&gt;mode=remote"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=2;fontSize=10;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="193" y="568" width="154" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="32" value="&lt;b&gt;Compute C&lt;/b&gt;&lt;br&gt;feilong&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;node_id=C&lt;/font&gt;&lt;br&gt;mode=remote"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=2;fontSize=10;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="354" y="568" width="154" height="68" as="geometry" />
+        </mxCell>
+
+        <mxCell id="33" value="✓ All nodes share one centralized database&lt;br&gt;✓ Rows scoped by compute_node_id — each node reads only its own rows&lt;br&gt;✓ FK constraints enforced ON DELETE CASCADE (remote mode only)&lt;br&gt;✓ Stale node detection via last_seen timeout — auto-marks inactive&lt;br&gt;✓ UPSERT on startup — register_compute_node() is idempotent&lt;br&gt;✓ image table uses sentinel compute_node_id=&apos;GLOBAL&apos; (shared images)&lt;br&gt;✓ Concurrent Alembic migrations serialised via _MIGRATION_LOCK"
+          style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=9;fontColor=#37474F;"
+          vertex="1" parent="1">
+          <mxGeometry x="32" y="650" width="520" height="116" as="geometry" />
+        </mxCell>
+
+        <mxCell id="34" value="Upgrade path: tools/migrate_sqlite_to_mariadb.py  (idempotent — safe to re-run)"
+          style="text;html=1;strokeColor=#F57F17;fillColor=#FFF9C4;align=center;verticalAlign=middle;fontSize=9;fontColor=#E65100;rounded=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="32" y="778" width="520" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="35" value="Firewall: allow TCP 3306 from compute node IPs only&lt;br&gt;Rollback: set backend=sqlite in zvmsdk.conf and restart — no data loss"
+          style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=9;fontColor=#37474F;"
+          vertex="1" parent="1">
+          <mxGeometry x="32" y="812" width="520" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ CENTER COLUMN ═══════════════════════════════════════════ -->
+        <mxCell id="40" value="SOFTWARE ARCHITECTURE STACK"
+          style="text;html=1;strokeColor=none;fillColor=#263238;align=center;fontColor=#ECEFF1;fontSize=12;fontStyle=1;verticalAlign=middle;rounded=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="580" y="82" width="720" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 1: REST API -->
+        <mxCell id="41" value="&lt;b style=&quot;font-size:11px;&quot;&gt;REST API Layer&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;smtclient.py  —  ensure_schema_current()  then  register_compute_node()&lt;/font&gt;&lt;br&gt;&lt;span style=&quot;font-size:9px;&quot;&gt;OpenStack nova.virt.zvm calls feilong REST API (transparent — no driver changes)&lt;/span&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;fontSize=10;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="580" y="120" width="720" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 2: DB Operators -->
+        <mxCell id="42" value=""
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#F57F17;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="580" y="216" width="720" height="104" as="geometry" />
+        </mxCell>
+        <mxCell id="43" value="DB Operator Layer  (zvmsdk/database.py)"
+          style="text;html=1;strokeColor=none;fillColor=none;align=center;fontColor=#E65100;fontSize=11;fontStyle=1;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="580" y="216" width="720" height="22" as="geometry" />
+        </mxCell>
+
+        <mxCell id="44" value="&lt;b&gt;NetworkDbOperator&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;switch table&lt;/font&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;get_switch_conn()&lt;/font&gt;&lt;br&gt;&lt;i style=&quot;font-size:8px;color:#9E9E9E;&quot;&gt;node-filtered in remote&lt;/i&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=1;fontSize=9;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="590" y="244" width="162" height="66" as="geometry" />
+        </mxCell>
+        <mxCell id="45" value="&lt;b&gt;GuestDbOperator&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;guests table&lt;/font&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;get_guest_conn()&lt;/font&gt;&lt;br&gt;&lt;i style=&quot;font-size:8px;color:#9E9E9E;&quot;&gt;node-filtered in remote&lt;/i&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=1;fontSize=9;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="760" y="244" width="162" height="66" as="geometry" />
+        </mxCell>
+        <mxCell id="46" value="&lt;b&gt;ImageDbOperator&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;image table&lt;/font&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;get_image_conn()&lt;/font&gt;&lt;br&gt;&lt;i style=&quot;font-size:8px;color:#9E9E9E;&quot;&gt;GLOBAL sentinel&lt;/i&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=1;fontSize=9;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="930" y="244" width="162" height="66" as="geometry" />
+        </mxCell>
+        <mxCell id="47" value="&lt;b&gt;FCPDbOperator&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;fcp + template&lt;/font&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;get_fcp_conn()&lt;/font&gt;&lt;br&gt;&lt;i style=&quot;font-size:8px;color:#9E9E9E;&quot;&gt;node-filtered in remote&lt;/i&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=1;fontSize=9;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="1100" y="244" width="192" height="66" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 3: zvmsdk/db package -->
+        <mxCell id="48" value=""
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#7B1FA2;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="580" y="348" width="720" height="132" as="geometry" />
+        </mxCell>
+        <mxCell id="49" value="zvmsdk/db/  Package  (new BYODB abstraction layer)"
+          style="text;html=1;strokeColor=none;fillColor=none;align=center;fontColor=#4A148C;fontSize=11;fontStyle=1;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="580" y="348" width="720" height="22" as="geometry" />
+        </mxCell>
+
+        <mxCell id="50" value="&lt;b&gt;&lt;font face=&quot;Courier New&quot;&gt;api.py&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;get_engine()  (singleton)&lt;br&gt;get_connection()  ctx mgr&lt;br&gt;get_compute_node_id()&lt;br&gt;register/deregister_node()&lt;br&gt;get_pool_status()&lt;/font&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE7F6;strokeColor=#9C27B0;strokeWidth=1;fontSize=9;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;"
+          vertex="1" parent="1">
+          <mxGeometry x="590" y="376" width="218" height="94" as="geometry" />
+        </mxCell>
+        <mxCell id="51" value="&lt;b&gt;&lt;font face=&quot;Courier New&quot;&gt;models.py&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;SQLAlchemy Table defs&lt;br&gt;compute_nodes + 7 tables&lt;br&gt;composite PKs per table&lt;br&gt;InnoDB / utf8mb4&lt;br&gt;utf8mb4_general_ci&lt;/font&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE7F6;strokeColor=#9C27B0;strokeWidth=1;fontSize=9;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;"
+          vertex="1" parent="1">
+          <mxGeometry x="816" y="376" width="218" height="94" as="geometry" />
+        </mxCell>
+        <mxCell id="52" value="&lt;b&gt;&lt;font face=&quot;Courier New&quot;&gt;migration.py&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;ensure_schema_current()&lt;br&gt;Alembic upgrade(&apos;head&apos;)&lt;br&gt;_MIGRATION_LOCK (concurrency)&lt;br&gt;_stamp_mariadb_if_fresh()&lt;br&gt;check/mark_stale_nodes()&lt;/font&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE7F6;strokeColor=#9C27B0;strokeWidth=1;fontSize=9;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;"
+          vertex="1" parent="1">
+          <mxGeometry x="1042" y="376" width="250" height="94" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 4: SQLAlchemy Core -->
+        <mxCell id="53" value="&lt;b style=&quot;font-size:11px;&quot;&gt;SQLAlchemy Core 2.x  +  Alembic&lt;/b&gt;&lt;br&gt;engine.begin() auto-commit/rollback  |  text() named :params  |  _CompatRow wrapper&lt;br&gt;URL.create() — password percent-encoded, never in logs  |  dialect-agnostic SQL"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EAF6;strokeColor=#3F51B5;strokeWidth=2;fontSize=9;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="580" y="500" width="720" height="66" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 5: Backends -->
+        <mxCell id="54" value="&lt;b&gt;SQLite Backend&lt;/b&gt;&lt;br&gt;StaticPool (single connection)&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;sqlite:///zvmsdk.db&lt;/font&gt;&lt;br&gt;check_same_thread=False"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;strokeWidth=2;fontSize=9;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="580" y="594" width="330" height="76" as="geometry" />
+        </mxCell>
+        <mxCell id="55" value="&lt;b&gt;MariaDB / MySQL Backend&lt;/b&gt;&lt;br&gt;QueuePool  |  pool_pre_ping=True&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;mysql+pymysql://  (pure Python, s390x)&lt;/font&gt;&lt;br&gt;pool_size=5  max_overflow=10  recycle=3600"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#7B1FA2;strokeWidth=2;fontSize=9;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="930" y="594" width="370" height="76" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 6: Storage -->
+        <mxCell id="56" value="&lt;b&gt;Local File&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;/var/lib/zvmsdk/databases/zvmsdk.db&lt;/font&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEDC8;strokeColor=#558B2F;strokeWidth=2;fontSize=9;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="580" y="690" width="330" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="57" value="&lt;b&gt;MariaDB Server&lt;/b&gt;&lt;br&gt;host:3306  |  database: zvmsdk  |  utf8mb4"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CE93D8;strokeColor=#7B1FA2;strokeWidth=2;fontSize=9;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="930" y="690" width="370" height="48" as="geometry" />
+        </mxCell>
+
+        <!-- compute_node_id Resolution panel -->
+        <mxCell id="58" value="&lt;b&gt;compute_node_id  Resolution  (once at startup in get_engine())&lt;/b&gt;&lt;br&gt;Priority 1: CONF.database.compute_node_id  — explicit operator override&lt;br&gt;Priority 2: vmcp query userid  →  &quot;USERID@ZVM_SYSTEM&quot;  (z/VM guest only)&lt;br&gt;Priority 3: CONF.network.my_ip  (always-available — required=True config field)&lt;br&gt;Result stored in _COMPUTE_NODE_ID global — all operators call get_compute_node_id()"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;strokeWidth=1;strokeDasharray=5 3;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;"
+          vertex="1" parent="1">
+          <mxGeometry x="580" y="756" width="720" height="88" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ RIGHT COLUMN ═══════════════════════════════════════════ -->
+        <mxCell id="60" value="DATA MODEL  &amp;  SCHEMA EVOLUTION"
+          style="text;html=1;strokeColor=none;fillColor=#263238;align=center;fontColor=#ECEFF1;fontSize=12;fontStyle=1;verticalAlign=middle;rounded=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="1330" y="82" width="1850" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- compute_nodes table -->
+        <mxCell id="61" value="&lt;b&gt;&lt;font face=&quot;Courier New&quot;&gt;compute_nodes&lt;/font&gt;  (NEW — node registry)&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;id            VARCHAR(64)   PK  ← this IS compute_node_id value&lt;br&gt;hostname      VARCHAR(255)  NOT NULL&lt;br&gt;ip_address    VARCHAR(45)   NOT NULL  (IPv6 ready)&lt;br&gt;zvm_host      VARCHAR(255)  (LPAR name)&lt;br&gt;last_seen     DATETIME      ON UPDATE NOW()&lt;br&gt;status        VARCHAR(16)   DEFAULT &apos;active&apos;&lt;br&gt;registered_at DATETIME      DEFAULT NOW()&lt;/font&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#546E7A;strokeWidth=2;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;"
+          vertex="1" parent="1">
+          <mxGeometry x="1330" y="120" width="680" height="148" as="geometry" />
+        </mxCell>
+
+        <!-- compute_node_id legend -->
+        <mxCell id="62" value="&lt;b&gt;compute_node_id Strategy&lt;/b&gt;&lt;br&gt;• Added to ALL 7 data tables as NOT NULL&lt;br&gt;• Forms composite PK with domain key (fcp_id, etc.)&lt;br&gt;• Local mode: stored but NOT used in query filtering&lt;br&gt;• Remote mode: FK enforced + _node_filter() on reads&lt;br&gt;• image table: DEFAULT &apos;GLOBAL&apos; (shared images)&lt;br&gt;• ON DELETE CASCADE from compute_nodes (remote only)&lt;br&gt;• Two nodes can hold same fcp_id — PK is composite"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#E65100;strokeWidth=2;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fontColor=#37474F;"
+          vertex="1" parent="1">
+          <mxGeometry x="2030" y="120" width="1150" height="148" as="geometry" />
+        </mxCell>
+
+        <!-- Data tables header -->
+        <mxCell id="63" value="DATA TABLES  (all 7 tables — compute_node_id column highlighted in orange in each table)"
+          style="text;html=1;strokeColor=none;fillColor=#37474F;align=center;fontColor=#B0BEC5;fontSize=10;fontStyle=1;verticalAlign=middle;rounded=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="1330" y="282" width="1850" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- Row 1 tables -->
+        <mxCell id="64" value="&lt;b&gt;&lt;font face=&quot;Courier New&quot;&gt;guests&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;id       CHAR(36)     PK&lt;br&gt;userid   VARCHAR(8)&lt;br&gt;&lt;font color=&quot;#E65100&quot;&gt;node_id  VARCHAR(64)&lt;/font&gt;&lt;br&gt;metadata VARCHAR(255)&lt;br&gt;net_set  SMALLINT&lt;br&gt;comments TEXT&lt;/font&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;strokeWidth=2;fontSize=9;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;"
+          vertex="1" parent="1">
+          <mxGeometry x="1330" y="312" width="440" height="108" as="geometry" />
+        </mxCell>
+        <mxCell id="65" value="&lt;b&gt;&lt;font face=&quot;Courier New&quot;&gt;switch&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;userid   VARCHAR(8)  PK&lt;br&gt;iface    VARCHAR(4)  PK&lt;br&gt;&lt;font color=&quot;#E65100&quot;&gt;node_id  VARCHAR(64) PK&lt;/font&gt;&lt;br&gt;switch   VARCHAR(8)&lt;br&gt;port     VARCHAR(128)&lt;br&gt;comments VARCHAR(128)&lt;/font&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;strokeWidth=2;fontSize=9;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;"
+          vertex="1" parent="1">
+          <mxGeometry x="1780" y="312" width="440" height="108" as="geometry" />
+        </mxCell>
+        <mxCell id="66" value="&lt;b&gt;&lt;font face=&quot;Courier New&quot;&gt;image&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;imagename  VARCHAR(128) PK&lt;br&gt;&lt;font color=&quot;#E65100&quot;&gt;node_id    VARCHAR(64)  PK&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#5D4037&quot;&gt;  DEFAULT &apos;GLOBAL&apos;&lt;/font&gt;&lt;br&gt;md5sum     VARCHAR(512)&lt;br&gt;type       VARCHAR(16)&lt;br&gt;comments   VARCHAR(128)&lt;/font&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;strokeWidth=2;fontSize=9;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;"
+          vertex="1" parent="1">
+          <mxGeometry x="2230" y="312" width="450" height="108" as="geometry" />
+        </mxCell>
+        <mxCell id="67" value="&lt;b&gt;&lt;font face=&quot;Courier New&quot;&gt;fcp&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;fcp_id    CHAR(4)     PK&lt;br&gt;&lt;font color=&quot;#E65100&quot;&gt;node_id   VARCHAR(64) PK&lt;/font&gt;&lt;br&gt;assigner  VARCHAR(8)&lt;br&gt;chpid     CHAR(2)&lt;br&gt;pchid     CHAR(4)&lt;br&gt;tmpl_id   VARCHAR(32)&lt;/font&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;strokeWidth=2;fontSize=9;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;"
+          vertex="1" parent="1">
+          <mxGeometry x="2690" y="312" width="490" height="108" as="geometry" />
+        </mxCell>
+
+        <!-- Row 2 tables -->
+        <mxCell id="68" value="&lt;b&gt;&lt;font face=&quot;Courier New&quot;&gt;template&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;id           VARCHAR(32) PK&lt;br&gt;&lt;font color=&quot;#E65100&quot;&gt;node_id      VARCHAR(64) PK&lt;/font&gt;&lt;br&gt;name         VARCHAR(128)&lt;br&gt;is_default   BOOLEAN&lt;br&gt;min_fcp_paths INT&lt;br&gt;description  VARCHAR(255)&lt;/font&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;strokeWidth=2;fontSize=9;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;"
+          vertex="1" parent="1">
+          <mxGeometry x="1330" y="428" width="430" height="108" as="geometry" />
+        </mxCell>
+        <mxCell id="69" value="&lt;b&gt;&lt;font face=&quot;Courier New&quot;&gt;template_sp_mapping&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;sp_name   VARCHAR(128) PK&lt;br&gt;&lt;font color=&quot;#E65100&quot;&gt;node_id   VARCHAR(64)  PK&lt;/font&gt;&lt;br&gt;tmpl_id   VARCHAR(32)&lt;br&gt;&lt;font color=&quot;#546E7A&quot;&gt;FK → template(id, node_id)&lt;br&gt;ON DELETE CASCADE&lt;/font&gt;&lt;/font&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;strokeWidth=2;fontSize=9;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;"
+          vertex="1" parent="1">
+          <mxGeometry x="1770" y="428" width="560" height="108" as="geometry" />
+        </mxCell>
+        <mxCell id="70" value="&lt;b&gt;&lt;font face=&quot;Courier New&quot;&gt;template_fcp_mapping&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;fcp_id    CHAR(4)     PK&lt;br&gt;tmpl_id   VARCHAR(32) PK&lt;br&gt;&lt;font color=&quot;#E65100&quot;&gt;node_id   VARCHAR(64) PK&lt;/font&gt;&lt;br&gt;path      INTEGER&lt;br&gt;&lt;font color=&quot;#546E7A&quot;&gt;FK → template(id, node_id) CASCADE&lt;br&gt;FK → fcp(fcp_id, node_id) CASCADE&lt;/font&gt;&lt;/font&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;strokeWidth=2;fontSize=9;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;"
+          vertex="1" parent="1">
+          <mxGeometry x="2340" y="428" width="840" height="108" as="geometry" />
+        </mxCell>
+
+        <!-- FK warning -->
+        <mxCell id="71" value="REMOTE MODE ONLY: FK constraints from all 7 tables → compute_nodes.id  (added by migration 0004, no-op in local mode)"
+          style="text;html=1;strokeColor=#C62828;fillColor=#FCE4EC;align=center;fontColor=#B71C1C;fontSize=9;verticalAlign=middle;rounded=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="1330" y="548" width="1850" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Alembic chain header -->
+        <mxCell id="72" value="ALEMBIC MIGRATION CHAIN  (auto-applied at startup via ensure_schema_current())"
+          style="text;html=1;strokeColor=none;fillColor=#37474F;align=center;fontColor=#B0BEC5;fontSize=10;fontStyle=1;verticalAlign=middle;rounded=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="1330" y="580" width="1850" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- Alembic boxes -->
+        <mxCell id="73" value="&lt;b&gt;0001&lt;/b&gt;&lt;br&gt;SQLite baseline&lt;br&gt;All 7 tables created&lt;br&gt;No compute_node_id&lt;br&gt;&lt;i style=&quot;color:#9E9E9E;&quot;&gt;existing installs&lt;/i&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#546E7A;strokeWidth=2;fontSize=9;align=center;verticalAlign=middle;fontFamily=Courier New;"
+          vertex="1" parent="1">
+          <mxGeometry x="1330" y="612" width="430" height="84" as="geometry" />
+        </mxCell>
+        <mxCell id="74" value="&lt;b&gt;0002&lt;/b&gt;&lt;br&gt;MariaDB baseline&lt;br&gt;InnoDB + utf8mb4&lt;br&gt;All 7 tables&lt;br&gt;&lt;i style=&quot;color:#9E9E9E;&quot;&gt;no-op for SQLite&lt;/i&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#546E7A;strokeWidth=2;fontSize=9;align=center;verticalAlign=middle;fontFamily=Courier New;"
+          vertex="1" parent="1">
+          <mxGeometry x="1780" y="612" width="420" height="84" as="geometry" />
+        </mxCell>
+        <mxCell id="75" value="&lt;b&gt;0003&lt;/b&gt;&lt;br&gt;+ compute_node_id col&lt;br&gt;+ compute_nodes table&lt;br&gt;Expand composite PKs&lt;br&gt;&lt;i style=&quot;color:#9E9E9E;&quot;&gt;backfill existing rows&lt;/i&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#546E7A;strokeWidth=2;fontSize=9;align=center;verticalAlign=middle;fontFamily=Courier New;"
+          vertex="1" parent="1">
+          <mxGeometry x="2220" y="612" width="450" height="84" as="geometry" />
+        </mxCell>
+        <mxCell id="76" value="&lt;b&gt;0004&lt;/b&gt;&lt;br&gt;+ FK constraints&lt;br&gt;remote mode ONLY&lt;br&gt;ON DELETE CASCADE&lt;br&gt;&lt;i style=&quot;color:#9E9E9E;&quot;&gt;no-op in local mode&lt;/i&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#546E7A;strokeWidth=2;fontSize=9;align=center;verticalAlign=middle;fontFamily=Courier New;"
+          vertex="1" parent="1">
+          <mxGeometry x="2690" y="612" width="490" height="84" as="geometry" />
+        </mxCell>
+
+        <!-- Test coverage -->
+        <mxCell id="77" value="&lt;b&gt;Test Coverage — 9 Phases Complete&lt;/b&gt;&lt;br&gt;202 PASS  |  26 SKIP (MariaDB — require ZVMSDK_TEST_DB_URL)  |  0 FAIL&lt;br&gt;test_database(84)  |  test_remote_mode(12)  |  test_concurrent_startup(10)  |  test_migrate_tool(19)  |  test_hardening(18)  |  +8 more files"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;strokeWidth=2;fontSize=9;align=center;verticalAlign=middle;fontColor=#1B5E20;"
+          vertex="1" parent="1">
+          <mxGeometry x="1330" y="708" width="1850" height="62" as="geometry" />
+        </mxCell>
+
+        <!-- Tech stack -->
+        <mxCell id="78" value="&lt;b&gt;Tech Stack&lt;/b&gt;&lt;br&gt;• SQLAlchemy Core 2.x — dialect abstraction (not ORM); preserves ~2600 lines of hand-written SQL&lt;br&gt;• Alembic — schema versioning; advisory lock for concurrent multi-node migration safety&lt;br&gt;• PyMySQL (pure Python) — no C extension; works on s390x IBM Z architecture&lt;br&gt;• _CompatRow wrapper — allows row[0] (positional) and row[&apos;col&apos;] (named) access on SQLAlchemy Row"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#455A64;strokeWidth=1;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;"
+          vertex="1" parent="1">
+          <mxGeometry x="1330" y="782" width="1850" height="96" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ BOTTOM ROW ═══════════════════════════════════════════ -->
+
+        <!-- ─── LEFT BOTTOM: Startup Sequence ─── -->
+        <mxCell id="80" value="STARTUP SEQUENCE  (smtclient.py)"
+          style="text;html=1;strokeColor=none;fillColor=#263238;align=center;fontColor=#ECEFF1;fontSize=12;fontStyle=1;verticalAlign=middle;rounded=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="1010" width="540" height="24" as="geometry" />
+        </mxCell>
+
+        <mxCell id="81" value="&lt;b&gt;load&lt;/b&gt;&lt;br&gt;config()&lt;br&gt;&lt;i style=&quot;font-size:8px;color:#9E9E9E;&quot;&gt;zvmsdk.conf&lt;/i&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;fontSize=9;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="1044" width="86" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="82" value="&lt;b&gt;ensure&lt;/b&gt;&lt;br&gt;schema&lt;br&gt;current()"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;fontSize=9;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="118" y="1044" width="86" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="83" value="&lt;b&gt;verify&lt;/b&gt;&lt;br&gt;remote&lt;br&gt;connect()&lt;br&gt;&lt;i style=&quot;font-size:7px;color:#9C27B0;&quot;&gt;remote only&lt;/i&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE7F6;strokeColor=#7B1FA2;strokeWidth=2;strokeDasharray=4 2;fontSize=9;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="216" y="1044" width="86" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="84" value="&lt;b&gt;register&lt;/b&gt;&lt;br&gt;compute&lt;br&gt;_node()&lt;br&gt;&lt;i style=&quot;font-size:8px;color:#9E9E9E;&quot;&gt;UPSERT&lt;/i&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;fontSize=9;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="314" y="1044" width="86" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="85" value="&lt;b&gt;check&lt;/b&gt;&lt;br&gt;stale&lt;br&gt;nodes()&lt;br&gt;&lt;i style=&quot;font-size:7px;color:#9E9E9E;&quot;&gt;swallows err&lt;/i&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;strokeWidth=2;fontSize=9;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="412" y="1044" width="86" height="52" as="geometry" />
+        </mxCell>
+
+        <mxCell id="86" value="✓  Ready to serve requests"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1B5E20;strokeColor=none;fontSize=12;fontStyle=1;fontColor=#FFFFFF;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="1108" width="540" height="28" as="geometry" />
+        </mxCell>
+
+        <mxCell id="87" value="• register_compute_node() uses UPSERT — idempotent on restart&lt;br&gt;• check_stale_nodes() swallows all exceptions — startup must not fail&lt;br&gt;• _MIGRATION_LOCK serialises concurrent Alembic callers in-process&lt;br&gt;• deregister_compute_node() on clean shutdown (sets status=inactive)&lt;br&gt;• Stale: NOW()-INTERVAL :s SECOND (MariaDB) / datetime(&apos;now&apos;,&apos;-Ns&apos;) (SQLite)&lt;br&gt;• Pool event listeners track lifetime_checked_out/invalidated counters&lt;br&gt;• _CONN_LOCAL (thread-local): nested get_connection() reuses same txn"
+          style="text;html=1;strokeColor=#B0BEC5;fillColor=#FAFAFA;align=left;verticalAlign=top;fontSize=9;fontColor=#37474F;spacingLeft=8;spacingTop=6;rounded=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="1148" width="540" height="130" as="geometry" />
+        </mxCell>
+
+        <!-- ─── CENTER BOTTOM: Security & Config ─── -->
+        <mxCell id="90" value="SECURITY,  CREDENTIALS  &amp;  CONFIGURATION"
+          style="text;html=1;strokeColor=none;fillColor=#263238;align=center;fontColor=#ECEFF1;fontSize=12;fontStyle=1;verticalAlign=middle;rounded=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="580" y="1010" width="720" height="24" as="geometry" />
+        </mxCell>
+
+        <mxCell id="91" value="&lt;b&gt;TLS / SSL&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;ssl_ca   = ca-cert.pem&lt;br&gt;ssl_cert = client-cert.pem&lt;br&gt;ssl_key  = client-key.pem&lt;/font&gt;&lt;br&gt;Verify: SHOW STATUS &apos;Ssl_cipher&apos;&lt;br&gt;require_secure_transport=ON&lt;br&gt;mTLS supported (client cert)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBEE;strokeColor=#C62828;strokeWidth=2;fontSize=9;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;"
+          vertex="1" parent="1">
+          <mxGeometry x="580" y="1044" width="224" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="92" value="&lt;b&gt;Credential Hardening&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;ZVMSDK_DB_PASSWORD&lt;/font&gt; env var&lt;br&gt;config wins if set; env = fallback&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;URL.create()&lt;/font&gt; — %-encode pw&lt;br&gt;password never in log output&lt;br&gt;bandit: 0 medium/high findings&lt;br&gt;5 low # nosec with justification"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBEE;strokeColor=#C62828;strokeWidth=2;fontSize=9;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;"
+          vertex="1" parent="1">
+          <mxGeometry x="814" y="1044" width="224" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="93" value="&lt;b&gt;Pool Monitoring&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;get_pool_status()&lt;/font&gt;&lt;br&gt;pool_size, checked_out, overflow&lt;br&gt;lifetime_checked_out/checked_in&lt;br&gt;lifetime_invalidated counter&lt;br&gt;pool_pre_ping=True (MariaDB)&lt;br&gt;event.listens_for on checkout"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBEE;strokeColor=#C62828;strokeWidth=2;fontSize=9;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;"
+          vertex="1" parent="1">
+          <mxGeometry x="1048" y="1044" width="252" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="94" value="&lt;b&gt;zvmsdk.conf  [database]  —  17+ New Options&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;table style=&quot;font-size:8px;font-family:Courier New;&quot;&gt;&lt;tr&gt;&lt;td&gt;backend = sqlite | mariadb | mysql&lt;/td&gt;&lt;td&gt;pool_size         = 5&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;mode    = local | remote&lt;/td&gt;&lt;td&gt;pool_max_overflow = 10&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;host / port / name / user / password&lt;/td&gt;&lt;td&gt;pool_timeout      = 30&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;compute_node_id  (auto-detected)&lt;/td&gt;&lt;td&gt;pool_recycle      = 3600&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dir  (SQLite file directory)&lt;/td&gt;&lt;td&gt;connection  (full SQLAlchemy URL)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;ssl_ca / ssl_cert / ssl_key&lt;/td&gt;&lt;td&gt;alembic_config  (optional override)&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#455A64;strokeWidth=1;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;"
+          vertex="1" parent="1">
+          <mxGeometry x="580" y="1164" width="720" height="158" as="geometry" />
+        </mxCell>
+
+        <!-- ─── RIGHT BOTTOM: Migration Tool ─── -->
+        <mxCell id="100" value="DATA MIGRATION TOOL  &amp;  BACKWARD COMPATIBILITY"
+          style="text;html=1;strokeColor=none;fillColor=#263238;align=center;fontColor=#ECEFF1;fontSize=12;fontStyle=1;verticalAlign=middle;rounded=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="1330" y="1010" width="1850" height="24" as="geometry" />
+        </mxCell>
+
+        <mxCell id="101" value="&lt;b&gt;Source  (never modified)&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;sdk_network.sqlite&lt;br&gt;sdk_guest.sqlite&lt;br&gt;sdk_image.sqlite&lt;br&gt;sdk_fcp.sqlite&lt;/font&gt;&lt;br&gt;&lt;i style=&quot;font-size:8px;color:#E65100;&quot;&gt;4 old per-domain files&lt;/i&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;strokeWidth=2;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;"
+          vertex="1" parent="1">
+          <mxGeometry x="1330" y="1044" width="530" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="102" value="&lt;b&gt;Migration Script&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;migrate_sqlite_to_mariadb.py&lt;br&gt;--sqlite-dir  (source path)&lt;br&gt;--target-backend  sqlite|mariadb&lt;br&gt;--compute-node-id  (injected)&lt;br&gt;--dry-run  (counts only)&lt;/font&gt;&lt;br&gt;&lt;i style=&quot;color:#E65100;&quot;&gt;INSERT IGNORE  |  batch=500&lt;/i&gt;"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;strokeWidth=3;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;"
+          vertex="1" parent="1">
+          <mxGeometry x="1910" y="1044" width="580" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="103" value="&lt;b&gt;Target&lt;/b&gt;&lt;br&gt;• New consolidated SQLite, OR&lt;br&gt;• Centralized MariaDB/MySQL&lt;br&gt;• Schema auto-upgraded (Alembic)&lt;br&gt;• Row count verified per table&lt;br&gt;• Idempotent — safe to re-run&lt;br&gt;• Exit 1 on count mismatch"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;strokeWidth=2;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;"
+          vertex="1" parent="1">
+          <mxGeometry x="2550" y="1044" width="630" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="104" value="• SOURCE_MAP: per-table column mapping with src_cols + tgt_cols (including compute_node_id)&lt;br&gt;• _inject_node_id(): stamps every migrated row — image rows always get &apos;GLOBAL&apos;&lt;br&gt;• Source SQLite files NEVER modified — re-running with INSERT IGNORE skips already-migrated rows"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#455A64;strokeWidth=1;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;"
+          vertex="1" parent="1">
+          <mxGeometry x="1330" y="1164" width="1850" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="105" value="&lt;b&gt;Backward Compatibility Guarantee&lt;/b&gt;&lt;br&gt;✓ Default: backend=sqlite, mode=local — existing deployments need ZERO config changes&lt;br&gt;✓ SQLite path uses StaticPool — identical behavior to legacy sqlite3 single-connection pattern&lt;br&gt;✓ compute_node_id stored in all rows but local mode never uses it in WHERE clauses&lt;br&gt;✓ Rollback: set backend=sqlite in zvmsdk.conf and restart — source SQLite files untouched"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;strokeWidth=2;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fontColor=#2E7D32;"
+          vertex="1" parent="1">
+          <mxGeometry x="1330" y="1236" width="1850" height="92" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ EDGES / CONNECTIONS ═══════════════════════════════════════════ -->
+
+        <!-- Node A → SQLite -->
+        <mxCell id="200" value="local I/O"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#388E3C;strokeWidth=2;fontSize=8;fontColor=#388E3C;"
+          edge="1" source="22" target="23" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Node B → MariaDB local -->
+        <mxCell id="201" value="local I/O"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#388E3C;strokeWidth=2;fontSize=8;fontColor=#388E3C;"
+          edge="1" source="24" target="25" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- MariaDB Central → Compute A (TLS) -->
+        <mxCell id="202" value="TLS/SSL"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#7B1FA2;strokeWidth=2;dashed=1;dashPattern=5 3;fontSize=8;fontColor=#7B1FA2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;"
+          edge="1" source="29" target="30" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- MariaDB Central → Compute B (TLS) -->
+        <mxCell id="203" value="TLS/SSL"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#7B1FA2;strokeWidth=2;dashed=1;dashPattern=5 3;fontSize=8;fontColor=#7B1FA2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;"
+          edge="1" source="29" target="31" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- MariaDB Central → Compute C (TLS) -->
+        <mxCell id="204" value="TLS/SSL"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#7B1FA2;strokeWidth=2;dashed=1;dashPattern=5 3;fontSize=8;fontColor=#7B1FA2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;"
+          edge="1" source="29" target="32" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- REST API → DB Operators -->
+        <mxCell id="205" value=""
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#546E7A;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;"
+          edge="1" source="41" target="42" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- DB Operators → db/ package -->
+        <mxCell id="206" value=""
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#546E7A;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;"
+          edge="1" source="42" target="48" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- db/ package → SQLAlchemy -->
+        <mxCell id="207" value=""
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#546E7A;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;"
+          edge="1" source="48" target="53" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- SQLAlchemy → SQLite Backend -->
+        <mxCell id="208" value="SQLite dialect"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#546E7A;strokeWidth=2;fontSize=8;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;"
+          edge="1" source="53" target="54" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- SQLAlchemy → MariaDB Backend -->
+        <mxCell id="209" value="MySQL dialect"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#546E7A;strokeWidth=2;fontSize=8;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;"
+          edge="1" source="53" target="55" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- SQLite Backend → File Storage -->
+        <mxCell id="210" value=""
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#388E3C;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;"
+          edge="1" source="54" target="56" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- MariaDB Backend → MariaDB Server -->
+        <mxCell id="211" value=""
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#7B1FA2;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;"
+          edge="1" source="55" target="57" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Alembic chain arrows -->
+        <mxCell id="212" value=""
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#546E7A;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+          edge="1" source="73" target="74" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="213" value=""
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#546E7A;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+          edge="1" source="74" target="75" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="214" value=""
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#546E7A;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+          edge="1" source="75" target="76" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Startup sequence flow -->
+        <mxCell id="215" value=""
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#1565C0;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+          edge="1" source="81" target="82" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="216" value=""
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#1565C0;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+          edge="1" source="82" target="83" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="217" value=""
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#1565C0;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+          edge="1" source="83" target="84" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="218" value=""
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#1565C0;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+          edge="1" source="84" target="85" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="219" value=""
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#1B5E20;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;"
+          edge="1" source="85" target="86" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Migration tool flow -->
+        <mxCell id="220" value="read rows"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#E65100;strokeWidth=2;fontSize=8;fontColor=#E65100;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+          edge="1" source="101" target="102" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="221" value="insert rows"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#E65100;strokeWidth=2;fontSize=8;fontColor=#E65100;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+          edge="1" source="102" target="103" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
